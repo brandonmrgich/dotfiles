@@ -17,6 +17,13 @@ Before acting on any request:
 - Prefer actionable output over commentary.
 - Do not repeat context the user already provided.
 
+## Reading discipline
+
+- Read only what the task domain explicitly requires. Do not pre-read speculatively or scan broadly.
+- Re-read a file only when: the task explicitly modifies what it covers, or the user says to refresh it.
+- Never scan the full project or docs directory unprompted.
+- "Inspect relevant context" means targeted reads — not exhaustive ones.
+
 ## Debugging behavior
 
 - Ground diagnosis in observable evidence: logs, error messages, reproduction steps.
