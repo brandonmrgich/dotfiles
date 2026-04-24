@@ -6,7 +6,7 @@ source ~/.zsh/env.zsh
 
 # --- Oh My Zsh ---
 export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
+ZSH_THEME=""  # disabled — starship handles the prompt (fallback: robbyrussell)
 CASE_SENSITIVE="true"
 DISABLE_UNTRACKED_FILES_DIRTY="true"
 zstyle ':omz:update' mode reminder
@@ -19,6 +19,9 @@ source ~/.zsh/completion.zsh
 source ~/.zsh/aliases.zsh
 source ~/.zsh/functions.zsh
 source ~/.zsh/tmux.zsh
+
+# --- Starship prompt ---
+eval "$(starship init zsh)"
 
 # --- Optional local overrides (not tracked in dotfiles) ---
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

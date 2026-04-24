@@ -1,0 +1,54 @@
+# starship.toml — global prompt config
+# Docs: https://starship.rs/config/
+
+format = """
+$directory$git_branch$git_status$git_state $character"""
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+style = "bold cyan"
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+symbol = " "
+style = "bold purple"
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = "bold yellow"
+conflicted = "!"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+untracked = "?"
+stashed = "$"
+modified = "~"
+staged = "+"
+renamed = "»"
+deleted = "✘"
+
+[git_state]
+format = '\([$state($progress_current/$progress_total)]($style)\) '
+style = "bold red"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[cmd_duration]
+min_time = 2_000
+format = "[$duration](bold yellow) "
+
+# Disabled — keep prompt lean
+[package]
+disabled = true
+
+[nodejs]
+disabled = true
+
+[python]
+disabled = true
+
+[rust]
+disabled = true
