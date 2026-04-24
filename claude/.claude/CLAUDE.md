@@ -3,6 +3,7 @@
 ## Workflow discipline
 
 Before acting on any request:
+
 1. Understand intent — ask one focused clarifying question if the goal is ambiguous
 2. Inspect relevant context (files, sidecars, git state) before proposing changes
 3. Propose a minimal plan; get implicit or explicit buy-in before executing
@@ -64,37 +65,37 @@ just_use <filename>.<ext>
 
 ### Label taxonomy
 
-| Label | Meaning |
-|---|---|
-| `CANONICAL` | Single source of truth; edits ripple widely |
-| `ELEGANT` | Exemplary — match its style nearby |
-| `INTRICATE` | Algorithmically dense; test rigorously before touching |
-| `WORKHORSE` | Ugly but productive; don't polish, just modify |
-| `CLEAN_INFRA` | Well-factored plumbing; don't bloat it |
-| `SCAFFOLD` | Wires things together; easy to miss a connection |
-| `ROUTER` | Top-level dispatcher; low logic density |
-| `SIMPLE` | Short and obvious |
-| `TINY` | Fits entirely in your head |
-| `EARLY` | Work-in-progress; shape not settled |
-| `SPRAWLING` | Big and growing; be careful adding scope |
-| `ONE_OFF` | Genuinely unique; accept its idiosyncrasy |
-| `GENERATED` | Do NOT hand-edit; regenerate instead |
-| `TOOL` | Stand-alone utility; edits ripple nowhere |
+| Label         | Meaning                                                |
+| ------------- | ------------------------------------------------------ |
+| `CANONICAL`   | Single source of truth; edits ripple widely            |
+| `ELEGANT`     | Exemplary — match its style nearby                     |
+| `INTRICATE`   | Algorithmically dense; test rigorously before touching |
+| `WORKHORSE`   | Ugly but productive; don't polish, just modify         |
+| `CLEAN_INFRA` | Well-factored plumbing; don't bloat it                 |
+| `SCAFFOLD`    | Wires things together; easy to miss a connection       |
+| `ROUTER`      | Top-level dispatcher; low logic density                |
+| `SIMPLE`      | Short and obvious                                      |
+| `TINY`        | Fits entirely in your head                             |
+| `EARLY`       | Work-in-progress; shape not settled                    |
+| `SPRAWLING`   | Big and growing; be careful adding scope               |
+| `ONE_OFF`     | Genuinely unique; accept its idiosyncrasy              |
+| `GENERATED`   | Do NOT hand-edit; regenerate instead                   |
+| `TOOL`        | Stand-alone utility; edits ripple nowhere              |
 
 ### Role taxonomy
 
-| Role keyword | Meaning |
-|---|---|
-| `domain` | Core types, rules, invariants; no I/O |
-| `encodes domain knowledge` | Alias for `domain` |
-| `supports feature` | Handler, endpoint, or product feature |
-| `agent tool` | Script/CLI run by an agent or developer |
-| `pure helpers` | Stateless utilities; no side effects |
-| `derived data` | Computes from other sources; no canonical state |
-| `read-side` | Read-only surface over a data layer |
-| `one-shot` | Runs once; not part of normal flow |
-| `historical` | Preserved for context; do not modify |
-| `legacy` | Functional but slated for replacement |
+| Role keyword               | Meaning                                         |
+| -------------------------- | ----------------------------------------------- |
+| `domain`                   | Core types, rules, invariants; no I/O           |
+| `encodes domain knowledge` | Alias for `domain`                              |
+| `supports feature`         | Handler, endpoint, or product feature           |
+| `agent tool`               | Script/CLI run by an agent or developer         |
+| `pure helpers`             | Stateless utilities; no side effects            |
+| `derived data`             | Computes from other sources; no canonical state |
+| `read-side`                | Read-only surface over a data layer             |
+| `one-shot`                 | Runs once; not part of normal flow              |
+| `historical`               | Preserved for context; do not modify            |
+| `legacy`                   | Functional but slated for replacement           |
 
 **Format:** `# role: <keyword>` or `# role: <keyword> — <what specifically>`
 
