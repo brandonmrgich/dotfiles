@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # tmux.zsh — tmux session helpers
 
 # Create or attach to a session named after the current directory

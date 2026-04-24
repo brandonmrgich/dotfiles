@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # aliases.zsh — shell aliases
 
 # Defaults

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # completion.zsh — post-oh-my-zsh completion tweaks
 
 # Additional completion sources installed via Homebrew

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # functions.zsh — shell functions
 
 youtube-dl() {
