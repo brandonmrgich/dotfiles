@@ -178,3 +178,31 @@ current project, so execution resumes across sessions.
 
 **Auditing:** plan-executor invokes plan-auditor only on demand mid-plan,
 automatically once at plan completion.
+
+---
+
+## Environment Map
+
+Brandon runs a personal multi-host setup centered on a MacBook Pro M1 (primary dev + music production). Always-on infrastructure: Debian MacBook 2012 (agent host, Tailscale-routed), Raspberry Pi 4 (DNS via Pi-hole + Unbound), AWS EC2 (MusicPlatform production backend), Oracle Cloud (legacy standby). Tailscale (`tail2c0e11.ts.net`) is the cross-device network layer for personal devices; AWS and Oracle are public-IP only. All hosts have `~/.ssh/config` entries — access is always `ssh <alias>`.
+
+### Hosts
+
+| Host | Tailscale / IP | SSH user | Purpose |
+|---|---|---|---|
+| MacBook Pro M1 (`Brandons-MacBook-Pro.local`) | `m1-macbook` | — | Primary dev, Logic Pro, music production |
+| Debian MacBook 2012 (`macbook-intel-2012-debian`) | `debian-macbook` | brandon | Always-on agent host; Gastown orchestration planned |
+| Raspberry Pi 4 (`DietPi`) | `pi` · `100.78.214.27` | dietpi | Pi-hole + Unbound DNS; MVP config, early stage |
+| Oracle Cloud (`instance-20230401-new`) | none · `129.213.56.229` | opc | Legacy standby, no active services |
+| AWS EC2 (`ip-172-31-91-143`) | none · Elastic IP | ubuntu | MusicPlatform production (Docker + Nginx) |
+
+### Major repos
+
+| Path | Purpose |
+|---|---|
+| `~/Development/GitHubProjects/MusicPortfolio` | Full-stack music platform — Fastify API, Next.js, Postgres, Cloudflare CDN |
+| `~/Development/Freelance/Dubsync` | Freelance client work (fullstack) |
+| `~/Development/GitHubProjects/ContentAutomatorWeb/content-automator-web` | Multi-platform content posting, web (Vite/TS/Tailwind — active) |
+| `~/dotfiles` | GNU Stow dotfiles — shell, Claude, tmux, git, starship |
+| `~/.config/nvim` | Neovim config |
+
+For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.

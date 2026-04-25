@@ -48,7 +48,7 @@ stow -R <package>
 
 | Package  | Target path(s)                                  | Notes                                          |
 | -------- | ----------------------------------------------- | ---------------------------------------------- |
-| `claude` | `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh`, `~/.claude/skills/`, `~/.claude/agents/` | Claude Code config, statusline, skills, agents |
+| `claude` | `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh`, `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/environment/` | Claude Code config, statusline, skills, agents, environment map |
 | `git`    | `~/.gitconfig`                                  | User identity + LFS config                    |
 | `starship` | `~/starship.toml`                             | Prompt: directory + git branch/status/state   |
 | `tmux`   | `~/.config/tmux/tmux.conf`                      | Prefix C-a, vim-aware nav, vi copy mode       |
@@ -70,3 +70,19 @@ stow -R <package>
 - If a file in `~` is not yet stowed: move it into the package dir, remove the original, then run stow before committing.
 
 Drift between the repo and the live `~` symlinks is a bug. Catch it before every commit.
+
+## When to run stow (for Claude)
+
+Run `stow -d ~/dotfiles -t ~ claude` after ANY of these actions:
+
+| Action | Why |
+|---|---|
+| Adding a file to `claude/.claude/skills/<name>/` | New skill needs symlink |
+| Adding a file to `claude/.claude/agents/<name>/` | New agent needs symlink |
+| Adding a file to `claude/.claude/environment/` | New env doc needs symlink |
+| Adding `claude/.claude/<anything>` | Any new tracked path needs symlink |
+| Removing a tracked file | Stow may leave a dangling symlink — run `stow -R claude` |
+
+**Do not** create files directly in `~/.claude/` — always create in `~/dotfiles/claude/.claude/` first, then stow.
+
+Verify before committing: `ls -la ~/.claude/<new-path>` should show a symlink, not a real file.
