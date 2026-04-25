@@ -134,30 +134,41 @@ ephemeral TODOs.
 
 ## Homebrew skill standard
 
-All custom user-created skills live at `~/.claude/skills/<skill-name>/SKILL.md`
-(tracked in dotfiles at `claude/.claude/skills/<skill-name>/SKILL.md`).
+Skills are scoped at two levels:
 
-Every homebrew skill's `name` frontmatter field must be prefixed with `[HomebrewSkill]`:
+- **User-level** — live at `~/.claude/skills/<skill-name>/SKILL.md`
+  (tracked in dotfiles at `claude/.claude/skills/<skill-name>/SKILL.md`)
+- **Project-level** — live at `<project>/.claude/skills/<skill-name>/SKILL.md`
+
+The `name` frontmatter field must be prefixed to reflect scope:
 
 ```yaml
-name: "[HomebrewSkill] skill-name"
+name: "[HomebrewSkill] skill-name"   # user-level skill
+name: "[ProjectSkill] skill-name"    # project-level skill
 ```
 
 This distinguishes user-authored skills from built-in Claude Code skills in the
-skill picker. Apply this prefix to every new skill created, without exception.
+skill picker. Apply the correct prefix to every new skill created, without exception.
 
 ---
 
-## Plan execution system (user-wide skills)
+## Plan execution system
 
-This installation has a multi-task plan execution system installed:
+Two-layer system installed user-wide:
 
+**Skills (`~/.claude/skills/`):**
 - `plan-executor` — main orchestrator. Sequential, dispatch-and-collect.
-- `plan-executor-implementer` — sub-agent for code implementation tasks
-- `plan-executor-tester` — sub-agent for test-writing tasks
-- `plan-executor-documenter` — sub-agent for documentation tasks
-- `plan-executor-discovery` — sub-agent for inventory/discovery tasks
-- `plan-auditor` — independent compliance auditor (separate skill)
+- `plan-auditor` — independent compliance auditor (separate skill, invoked on-demand)
+
+**Agents (`~/.claude/agents/`):**
+- `plan-executor-implementer` — agent for code implementation tasks
+- `plan-executor-tester` — agent for test-writing tasks
+- `plan-executor-documenter` — agent for documentation tasks
+- `plan-executor-discovery` — agent for inventory/discovery tasks
+
+The orchestrator dispatches agents via the Task tool's `subagent_type`
+argument. Agents are registered at `~/.claude/agents/<name>.md` and the
+`name` in the file's frontmatter must match.
 
 **To run a plan:** invoke `plan-executor` with a master plan path and
 tasks directory. State is persisted to `.claude/plan-state.json` in the

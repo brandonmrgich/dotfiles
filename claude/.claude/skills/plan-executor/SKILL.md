@@ -147,24 +147,34 @@ per significant event (dispatch, return, failure, audit, halt).
 
 For each task in order:
 
-1. Determine the appropriate sub-agent type from the task's content:
-    - `discovery` — inventory, audit, mapping, surveying tasks
-    - `implementer` — writing application code, components, hooks
-    - `tester` — writing unit, integration, or E2E tests
-    - `documenter` — writing markdown docs, READMEs, ADRs
-    - `generic` — anything that doesn't cleanly fit the above
+1. Determine the appropriate agent type from the task's content:
+    - `plan-executor-discovery` — inventory, audit, mapping, surveying
+    - `plan-executor-implementer` — writing application code, components, hooks
+    - `plan-executor-tester` — writing unit, integration, or E2E tests
+    - `plan-executor-documenter` — writing markdown docs, READMEs, ADRs
+    - `general-purpose` — fallback for anything that doesn't cleanly
+      fit the above (this is a Claude Code built-in agent)
 
 2. Update state file: mark task as `in_progress`, write log entry.
 
-3. Dispatch via the Task tool. The dispatch prompt MUST include:
-    - The full content of the task file
-    - The path to the master plan (for the sub-agent to consult)
-    - The working branch
-    - An instruction to produce exactly the deliverables specified
-      in the task file, no more
-    - An instruction to return a structured summary on completion
-      (see "Required sub-agent return format" below)
-    - The sub-agent type so the corresponding skill activates
+3. Dispatch via the Task tool with:
+    - `subagent_type` set to one of: `plan-executor-implementer`,
+      `plan-executor-tester`, `plan-executor-documenter`,
+      `plan-executor-discovery`, or `general-purpose` (fallback).
+      These are REGISTERED CLAUDE CODE AGENTS at `~/.claude/agents/<name>.md`,
+      not skills. The Task tool will fail with "Agent type not found" if
+      you pass an unregistered name.
+    - `prompt` containing:
+      - The full content of the task file
+      - The path to the master plan (for the agent to consult)
+      - The working branch name
+      - An instruction to produce exactly the deliverables specified
+        in the task file, no more
+      - An instruction to return the structured summary specified in
+        "Required sub-agent return format" below
+    - A note that specialist skills (DDEX, Next.js, etc.) may activate
+      based on file paths or prompt content; the agent should follow
+      specialist guidance when triggered
 
 4. Wait for the sub-agent to return.
 
