@@ -43,7 +43,7 @@ if [ -n "$git_dir" ]; then
 
   if [ -f "$_cache_file" ]; then
     _mtime=$(stat -f %m "$_cache_file" 2>/dev/null)
-    if [ -n "$_mtime" ] && [ $(( $(date +%s) - _mtime )) -lt 2 ]; then
+    if [ -n "$_mtime" ] && [ $(( $(date +%s) - _mtime )) -lt 10 ]; then
       IFS=$'\t' read -r git_branch git_status_str git_state_str < "$_cache_file"
       _use_cache=1
     fi
