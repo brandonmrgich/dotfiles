@@ -108,9 +108,19 @@ just_use <filename>.<ext>
 
 ### When to create a sidecar
 
-- Creating a new non-trivial source file
-- Asked to analyze or explain a file that lacks one
+**Required — do not skip:**
+- Creating a new non-trivial source file → create its sidecar in the same commit
+- Editing a non-trivial file → update the sidecar if design intent or invariants changed
 - Discovering buried decisions, gotchas, or cross-file invariants while working
+
+**Not required:**
+- Do NOT sidecar every file in a codebase unless explicitly asked
+- Trivial files (simple configs, generated files, tiny utilities) do not need sidecars
+
+**Why sidecars matter:**
+Sidecars are stability signals and lightweight context anchors. They prevent codebase
+scouring by giving future sessions exactly the non-obvious information needed to touch
+a file safely — without re-reading the whole tree.
 
 ### What belongs in a sidecar
 
@@ -119,3 +129,41 @@ known gotchas, cross-language contracts, what NOT to do here and why.
 
 Not: anything obvious from reading the code, narration of what the code does,
 ephemeral TODOs.
+
+---
+
+## Homebrew skill standard
+
+All custom user-created skills live at `~/.claude/skills/<skill-name>/SKILL.md`
+(tracked in dotfiles at `claude/.claude/skills/<skill-name>/SKILL.md`).
+
+Every homebrew skill's `name` frontmatter field must be prefixed with `[HomebrewSkill]`:
+
+```yaml
+name: "[HomebrewSkill] skill-name"
+```
+
+This distinguishes user-authored skills from built-in Claude Code skills in the
+skill picker. Apply this prefix to every new skill created, without exception.
+
+---
+
+## Plan execution system (user-wide skills)
+
+This installation has a multi-task plan execution system installed:
+
+- `plan-executor` — main orchestrator. Sequential, dispatch-and-collect.
+- `plan-executor-implementer` — sub-agent for code implementation tasks
+- `plan-executor-tester` — sub-agent for test-writing tasks
+- `plan-executor-documenter` — sub-agent for documentation tasks
+- `plan-executor-discovery` — sub-agent for inventory/discovery tasks
+- `plan-auditor` — independent compliance auditor (separate skill)
+
+**To run a plan:** invoke `plan-executor` with a master plan path and
+tasks directory. State is persisted to `.claude/plan-state.json` in the
+current project, so execution resumes across sessions.
+
+**Failure behavior:** stop-and-ask on non-trivial failures.
+
+**Auditing:** plan-executor invokes plan-auditor only on demand mid-plan,
+automatically once at plan completion.
