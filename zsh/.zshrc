@@ -14,6 +14,15 @@ zstyle ':omz:update' frequency 7
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 source $ZSH/oh-my-zsh.sh
 
+# --- Bracketed paste — OMZ skips this when terminfo[smBP] is empty (macOS xterm-256color) ---
+unset zle_bracketed_paste  # clear any plugin override (e.g. zsh-autosuggestions)
+autoload -Uz bracketed-paste-magic add-zsh-hook
+zle -N bracketed-paste bracketed-paste-magic
+bindkey $'\e[200~' bracketed-paste
+# Re-enable after each command (Neovim sends \e[?2004l on exit, which disables it)
+_bp_precmd() { print -n '\e[?2004h' }
+add-zsh-hook precmd _bp_precmd
+
 # --- Post-OMZ modules ---
 source ~/.zsh/completion.zsh
 source ~/.zsh/aliases.zsh
