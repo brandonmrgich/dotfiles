@@ -8,7 +8,7 @@ This is a GNU Stow-managed dotfiles repo. Each top-level directory is a **stow p
 dotfiles/
   claude/          → stow package → ~/.claude/
   git/             → stow package → ~/
-  starship/        → stow package → ~/
+  starship/        → stow package → ~/.config/starship.toml
   tmux/            → stow package → ~/.config/tmux/
   zsh/             → stow package → ~/
 ```
@@ -50,7 +50,7 @@ stow -R <package>
 | -------- | ----------------------------------------------- | ---------------------------------------------- |
 | `claude` | `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh`, `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/environment/` | Claude Code config, statusline, skills, agents, environment map |
 | `git`    | `~/.gitconfig`                                  | User identity + LFS config                    |
-| `starship` | `~/starship.toml`                             | Prompt: directory + git branch/status/state   |
+| `starship` | `~/.config/starship.toml`                     | Prompt: directory + git branch/status/state   |
 | `tmux`   | `~/.config/tmux/tmux.conf`                      | Prefix C-a, vim-aware nav, vi copy mode       |
 | `zsh`    | `~/.zshrc`, `~/.zsh/`                           | Modular: env → omz → completion → aliases → functions → tmux |
 
