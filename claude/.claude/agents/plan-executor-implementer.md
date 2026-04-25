@@ -1,6 +1,6 @@
 ---
-name: "[HomebrewSkill] plan-executor-implementer"
-description: Activate when dispatched by the plan-executor orchestrator with a sub-agent type of "implementer". This skill specializes in writing application code, components, hooks, libraries, and other implementation work as part of a structured execution plan. Do NOT trigger this skill for ad-hoc coding requests, PR reviews, or work outside an active plan-executor dispatch. The dispatching prompt will explicitly identify itself as a plan-executor sub-agent dispatch.
+name: plan-executor-implementer
+description: Dispatched by the plan-executor orchestrator to complete implementation tasks: writing application code, components, hooks, and libraries as part of a structured execution plan.
 ---
 
 # Role: Plan Execution — Implementer Sub-agent

@@ -134,30 +134,41 @@ ephemeral TODOs.
 
 ## Homebrew skill standard
 
-All custom user-created skills live at `~/.claude/skills/<skill-name>/SKILL.md`
-(tracked in dotfiles at `claude/.claude/skills/<skill-name>/SKILL.md`).
+Skills are scoped at two levels:
 
-Every homebrew skill's `name` frontmatter field must be prefixed with `[HomebrewSkill]`:
+- **User-level** — live at `~/.claude/skills/<skill-name>/SKILL.md`
+  (tracked in dotfiles at `claude/.claude/skills/<skill-name>/SKILL.md`)
+- **Project-level** — live at `<project>/.claude/skills/<skill-name>/SKILL.md`
+
+The `name` frontmatter field must be prefixed to reflect scope:
 
 ```yaml
-name: "[HomebrewSkill] skill-name"
+name: "[HomebrewSkill] skill-name"   # user-level skill
+name: "[ProjectSkill] skill-name"    # project-level skill
 ```
 
 This distinguishes user-authored skills from built-in Claude Code skills in the
-skill picker. Apply this prefix to every new skill created, without exception.
+skill picker. Apply the correct prefix to every new skill created, without exception.
 
 ---
 
-## Plan execution system (user-wide skills)
+## Plan execution system
 
-This installation has a multi-task plan execution system installed:
+Two-layer system installed user-wide:
 
+**Skills (`~/.claude/skills/`):**
 - `plan-executor` — main orchestrator. Sequential, dispatch-and-collect.
-- `plan-executor-implementer` — sub-agent for code implementation tasks
-- `plan-executor-tester` — sub-agent for test-writing tasks
-- `plan-executor-documenter` — sub-agent for documentation tasks
-- `plan-executor-discovery` — sub-agent for inventory/discovery tasks
-- `plan-auditor` — independent compliance auditor (separate skill)
+- `plan-auditor` — independent compliance auditor (separate skill, invoked on-demand)
+
+**Agents (`~/.claude/agents/`):**
+- `plan-executor-implementer` — agent for code implementation tasks
+- `plan-executor-tester` — agent for test-writing tasks
+- `plan-executor-documenter` — agent for documentation tasks
+- `plan-executor-discovery` — agent for inventory/discovery tasks
+
+The orchestrator dispatches agents via the Task tool's `subagent_type`
+argument. Agents are registered at `~/.claude/agents/<name>.md` and the
+`name` in the file's frontmatter must match.
 
 **To run a plan:** invoke `plan-executor` with a master plan path and
 tasks directory. State is persisted to `.claude/plan-state.json` in the
@@ -167,3 +178,31 @@ current project, so execution resumes across sessions.
 
 **Auditing:** plan-executor invokes plan-auditor only on demand mid-plan,
 automatically once at plan completion.
+
+---
+
+## Environment Map
+
+Brandon runs a personal multi-host setup centered on a MacBook Pro M1 (primary dev + music production). Always-on infrastructure: Debian MacBook 2012 (agent host, Tailscale-routed), Raspberry Pi 4 (DNS via Pi-hole + Unbound), AWS EC2 (MusicPlatform production backend), Oracle Cloud (legacy standby). Tailscale (`tail2c0e11.ts.net`) is the cross-device network layer for personal devices; AWS and Oracle are public-IP only. All hosts have `~/.ssh/config` entries — access is always `ssh <alias>`.
+
+### Hosts
+
+| Host | Tailscale / IP | SSH user | Purpose |
+|---|---|---|---|
+| MacBook Pro M1 (`Brandons-MacBook-Pro.local`) | `m1-macbook` | — | Primary dev, Logic Pro, music production |
+| Debian MacBook 2012 (`macbook-intel-2012-debian`) | `debian-macbook` | brandon | Always-on agent host; Gastown orchestration planned |
+| Raspberry Pi 4 (`DietPi`) | `pi` · `100.78.214.27` | dietpi | Pi-hole + Unbound DNS; MVP config, early stage |
+| Oracle Cloud (`instance-20230401-new`) | none · `129.213.56.229` | opc | Legacy standby, no active services |
+| AWS EC2 (`ip-172-31-91-143`) | none · Elastic IP | ubuntu | MusicPlatform production (Docker + Nginx) |
+
+### Major repos
+
+| Path | Purpose |
+|---|---|
+| `~/Development/GitHubProjects/MusicPortfolio` | Full-stack music platform — Fastify API, Next.js, Postgres, Cloudflare CDN |
+| `~/Development/Freelance/Dubsync` | Freelance client work (fullstack) |
+| `~/Development/GitHubProjects/ContentAutomatorWeb/content-automator-web` | Multi-platform content posting, web (Vite/TS/Tailwind — active) |
+| `~/dotfiles` | GNU Stow dotfiles — shell, Claude, tmux, git, starship |
+| `~/.config/nvim` | Neovim config |
+
+For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.

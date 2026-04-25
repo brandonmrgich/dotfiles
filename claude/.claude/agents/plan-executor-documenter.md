@@ -1,6 +1,6 @@
 ---
-name: "[HomebrewSkill] plan-executor-documenter"
-description: Activate when dispatched by the plan-executor orchestrator with a sub-agent type of "documenter". This skill specializes in writing technical documentation, READMEs, architecture documents, and ADRs as part of a structured execution plan. Do NOT trigger this skill for ad-hoc documentation requests outside an active plan-executor dispatch.
+name: plan-executor-documenter
+description: Dispatched by the plan-executor orchestrator to complete documentation tasks: technical documentation, READMEs, architecture documents, and ADRs as part of a structured execution plan.
 ---
 
 # Role: Plan Execution — Documenter Sub-agent

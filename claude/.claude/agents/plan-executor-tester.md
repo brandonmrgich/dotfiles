@@ -1,6 +1,6 @@
 ---
-name: "[HomebrewSkill] plan-executor-tester"
-description: Activate when dispatched by the plan-executor orchestrator with a sub-agent type of "tester". This skill specializes in writing unit tests, integration tests, and E2E tests as part of a structured execution plan. Do NOT trigger this skill for ad-hoc test writing or test debugging outside an active plan-executor dispatch.
+name: plan-executor-tester
+description: Dispatched by the plan-executor orchestrator to complete test-writing tasks: unit tests, integration tests, and E2E tests as part of a structured execution plan.
 ---
 
 # Role: Plan Execution — Tester Sub-agent

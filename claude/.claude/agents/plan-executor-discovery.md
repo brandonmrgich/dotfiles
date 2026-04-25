@@ -1,6 +1,6 @@
 ---
-name: "[HomebrewSkill] plan-executor-discovery"
-description: Activate when dispatched by the plan-executor orchestrator with a sub-agent type of "discovery". This skill specializes in repository inventory, codebase mapping, dependency surveying, and producing structured findings as the first task of an execution plan. Do NOT trigger this skill for ad-hoc code search or exploration outside an active plan-executor dispatch.
+name: plan-executor-discovery
+description: Dispatched by the plan-executor orchestrator to complete discovery, inventory, codebase mapping, and surveying tasks. Typically the first task in an execution plan.
 ---
 
 # Role: Plan Execution — Discovery Sub-agent
