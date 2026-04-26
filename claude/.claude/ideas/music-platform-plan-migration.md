@@ -1,7 +1,7 @@
 ---
 title: Migrate music-platform-monorepo to new plan execution system
 created: 2026-04-26
-status: open
+status: archived
 tags: [migration, plan-executor, music-platform-monorepo]
 project: music-platform-monorepo
 ---
@@ -43,3 +43,7 @@ Run from `music-platform-monorepo` root:
 
 - Blocking agent's work merges
 - Self-contained migration — could be a small (trivial) plan run in interactive mode
+
+## Promoted to plan
+
+Executed directly (no formal plan needed). Committed on `legacy-plans-overhaul` branch in MusicPortfolio: `chore(claude): migrate plan state to plan-states/ layout and update gitignore`.
