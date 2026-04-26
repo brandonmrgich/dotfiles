@@ -51,6 +51,7 @@ When ambiguous, ask one focused question before proceeding.
    - The task
    - Current branch, repo root, and key paths relevant to the task
    - Instruction: explore first, then produce `.claude/zoom-plan-<slug>.md` if a plan is warranted
+   - Instruction: if producing a plan artifact (`.claude/zoom-plan-<slug>.md`), structure it as a valid master plan scaffold — include a `## Task index` section (even if placeholder) and a `Tasks for this plan: <tasks_dir>/` footer line. This allows the artifact to be promoted directly to a plan-executor plan without rewriting.
    - Instruction: implement only if the user's prompt explicitly asks for it
 3. Dispatch via the Agent tool. Pass `isolation: "worktree"` for code tasks.
 4. Write `.claude/zoom-state.json`:

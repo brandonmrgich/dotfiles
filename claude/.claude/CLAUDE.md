@@ -233,8 +233,8 @@ argument. Agents are registered at `~/.claude/agents/<name>.md` and the
 `name` in the file's frontmatter must match.
 
 **To run a plan:** invoke `plan-executor` with a master plan path and
-tasks directory. State is persisted to `.claude/plan-state.json` in the
-current project, so execution resumes across sessions.
+tasks directory. State is persisted to `.claude/plan-states/<plan-name>.json`
+in the current project, so execution resumes across sessions.
 
 **Failure behavior:** stop-and-ask on non-trivial failures.
 

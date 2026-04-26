@@ -1,0 +1,5 @@
+# Claude Code runtime artifacts — never commit
+.claude/plan-states/
+.claude/plan-completion-report.md
+.claude/plans/
+.claude/settings.local.json
