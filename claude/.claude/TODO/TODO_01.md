@@ -1,3 +1,22 @@
+> **STATUS (2026-04-26):** Partially superseded. See master plan at
+> `~/dotfiles/.claude/plans/skills-worktree-overhaul/MasterPlan.md`.
+>
+> **Changelog work is CANCELLED** — the changelog mechanism (Phase 1
+> "Changelog appending" section, Phase 2 steps 4–5, Phase 2 step 7
+> "Changelogs" section) was superseded by the doc-freshness front-matter
+> approach (see TODO_03, now executed). Do not implement any changelog steps.
+>
+> **Completed by this plan:**
+> - Phase 1: plan-executor updated (multi-plan state paths, removed changelog,
+>   added multi-plan awareness)
+> - Phase 3: worktree-orchestrator skill created
+> - Phase 4: zoom-in/zoom-out integration added
+>
+> **Still outstanding (not in this plan):**
+> - Phase 2: music-platform-monorepo project structure migration
+>   (.claude/plan-states/ dir, .gitignore update, CLAUDE.md update for that repo)
+> - Phase 5 commit: belongs in music-platform-monorepo, not here
+
 I'm restructuring how plans, plan state, changelogs, and worktrees are
 organized. This is a multi-skill update plus a project migration plus a
 new user-wide skill. Execute in phases. Stop and ask at each phase
