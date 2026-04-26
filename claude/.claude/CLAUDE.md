@@ -112,11 +112,13 @@ just_use <filename>.<ext>
 ### When to create a sidecar
 
 **Required — do not skip:**
+
 - Creating a new non-trivial source file → create its sidecar in the same commit
 - Editing a non-trivial file → update the sidecar if design intent or invariants changed
 - Discovering buried decisions, gotchas, or cross-file invariants while working
 
 **Not required:**
+
 - Do NOT sidecar every file in a codebase unless explicitly asked
 - Trivial files (simple configs, generated files, tiny utilities) do not need sidecars
 
@@ -154,6 +156,42 @@ An insight from an essay often deserves distillation into a memory; a memory des
 
 ---
 
+## TODO system
+
+TODOS_STORED=true
+
+note: This TODO system has been manually written by the user. Later future Claude should rewrite
+this to fit with the rest of the configuration.
+
+### TODO Event loop
+
+While TODOS_STORED=true, for every new session on startup, Claude should output a message like:
+`There are # TODOS stored. Would you like to work on one?`
+
+If the user says yes, list the available TODOs, numbered.
+
+If the user selects a number, use the 'plan-executor' skill to create plan to complete the TODO.
+
+Else, if the user asks to cancel, or doesnt wish to work on a TODO, simply continue normal
+operations.
+
+### TODO Info
+
+The count for TODOs, is equal to the number of TODO files in ~/.claude/TODO
+
+TODO files are user made, and read-only by Claude.
+
+TODO file semantics are as follows:
+
+```md
+- TODO_01.md
+- TODO_02.md
+  ...
+- TODO_XX.md
+```
+
+---
+
 ## Homebrew skill standard
 
 Skills are scoped at two levels:
@@ -179,10 +217,12 @@ skill picker. Apply the correct prefix to every new skill created, without excep
 Two-layer system installed user-wide:
 
 **Skills (`~/.claude/skills/`):**
+
 - `plan-executor` — main orchestrator. Sequential, dispatch-and-collect.
 - `plan-auditor` — independent compliance auditor (separate skill, invoked on-demand)
 
 **Agents (`~/.claude/agents/`):**
+
 - `plan-executor-implementer` — agent for code implementation tasks
 - `plan-executor-tester` — agent for test-writing tasks
 - `plan-executor-documenter` — agent for documentation tasks
@@ -209,22 +249,22 @@ Brandon runs a personal multi-host setup centered on a MacBook Pro M1 (primary d
 
 ### Hosts
 
-| Host | Tailscale / IP | SSH user | Purpose |
-|---|---|---|---|
-| MacBook Pro M1 (`Brandons-MacBook-Pro.local`) | `m1-macbook` | — | Primary dev, Logic Pro, music production |
-| Debian MacBook 2012 (`macbook-intel-2012-debian`) | `debian-macbook` | brandon | Always-on agent host; Gastown orchestration planned |
-| Raspberry Pi 4 (`DietPi`) | `pi` · `100.78.214.27` | dietpi | Pi-hole + Unbound DNS; MVP config, early stage |
-| Oracle Cloud (`instance-20230401-new`) | none · `129.213.56.229` | opc | Legacy standby, no active services |
-| AWS EC2 (`ip-172-31-91-143`) | none · Elastic IP | ubuntu | MusicPlatform production (Docker + Nginx) |
+| Host                                              | Tailscale / IP          | SSH user | Purpose                                             |
+| ------------------------------------------------- | ----------------------- | -------- | --------------------------------------------------- |
+| MacBook Pro M1 (`Brandons-MacBook-Pro.local`)     | `m1-macbook`            | —        | Primary dev, Logic Pro, music production            |
+| Debian MacBook 2012 (`macbook-intel-2012-debian`) | `debian-macbook`        | brandon  | Always-on agent host; Gastown orchestration planned |
+| Raspberry Pi 4 (`DietPi`)                         | `pi` · `100.78.214.27`  | dietpi   | Pi-hole + Unbound DNS; MVP config, early stage      |
+| Oracle Cloud (`instance-20230401-new`)            | none · `129.213.56.229` | opc      | Legacy standby, no active services                  |
+| AWS EC2 (`ip-172-31-91-143`)                      | none · Elastic IP       | ubuntu   | MusicPlatform production (Docker + Nginx)           |
 
 ### Major repos
 
-| Path | Purpose |
-|---|---|
-| `~/Development/GitHubProjects/MusicPortfolio` | Full-stack music platform — Fastify API, Next.js, Postgres, Cloudflare CDN |
-| `~/Development/Freelance/Dubsync` | Freelance client work (fullstack) |
-| `~/Development/GitHubProjects/ContentAutomatorWeb/content-automator-web` | Multi-platform content posting, web (Vite/TS/Tailwind — active) |
-| `~/dotfiles` | GNU Stow dotfiles — shell, Claude, tmux, git, starship |
-| `~/.config/nvim` | Neovim config |
+| Path                                                                     | Purpose                                                                    |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `~/Development/GitHubProjects/MusicPortfolio`                            | Full-stack music platform — Fastify API, Next.js, Postgres, Cloudflare CDN |
+| `~/Development/Freelance/Dubsync`                                        | Freelance client work (fullstack)                                          |
+| `~/Development/GitHubProjects/ContentAutomatorWeb/content-automator-web` | Multi-platform content posting, web (Vite/TS/Tailwind — active)            |
+| `~/dotfiles`                                                             | GNU Stow dotfiles — shell, Claude, tmux, git, starship                     |
+| `~/.config/nvim`                                                         | Neovim config                                                              |
 
 For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.
