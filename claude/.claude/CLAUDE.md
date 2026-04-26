@@ -156,39 +156,12 @@ An insight from an essay often deserves distillation into a memory; a memory des
 
 ---
 
-## TODO system
+## Ideas
 
-TODOS_STORED=true
-
-note: This TODO system has been manually written by the user. Later future Claude should rewrite
-this to fit with the rest of the configuration.
-
-### TODO Event loop
-
-While TODOS_STORED=true, for every new session on startup, Claude should output a message like:
-`There are # TODOS stored. Would you like to work on one?`
-
-If the user says yes, list the available TODOs, numbered.
-
-If the user selects a number, use the 'plan-executor' skill to create plan to complete the TODO.
-
-Else, if the user asks to cancel, or doesnt wish to work on a TODO, simply continue normal
-operations.
-
-### TODO Info
-
-The count for TODOs, is equal to the number of TODO files in ~/.claude/TODO
-
-TODO files are user made, and read-only by Claude.
-
-TODO file semantics are as follows:
-
-```md
-- TODO_01.md
-- TODO_02.md
-  ...
-- TODO_XX.md
-```
+Capture pre-plan ideas via the `idea-tracker` skill. Lives at `~/.claude/ideas/`,
+tracked in dotfiles. Activates on phrases like "save as idea", "track this", or
+"what ideas do I have". Replaces the legacy TODO system — TODOs were the prior
+mechanism for stashing things to build that didn't yet have concrete plans.
 
 ---
 
