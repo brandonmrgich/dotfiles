@@ -84,6 +84,9 @@ just_use <filename>.<ext>
 | `SIMPLE`      | Short and obvious                                      |
 | `TINY`        | Fits entirely in your head                             |
 | `EARLY`       | Work-in-progress; shape not settled                    |
+| `SPIKE`       | Exploratory; may be ripped — don't build on it         |
+| `BUGGY`       | Known-broken; advertise rather than hide               |
+| `VESTIGIAL`   | Superseded or dead; candidate for removal              |
 | `SPRAWLING`   | Big and growing; be careful adding scope               |
 | `ONE_OFF`     | Genuinely unique; accept its idiosyncrasy              |
 | `GENERATED`   | Do NOT hand-edit; regenerate instead                   |
@@ -129,6 +132,25 @@ known gotchas, cross-language contracts, what NOT to do here and why.
 
 Not: anything obvious from reading the code, narration of what the code does,
 ephemeral TODOs.
+
+### Sidecar maxims
+
+- **Honest labels.** If something is `SPIKE`, say `SPIKE`. Hiding maturity hurts future readers.
+- **Pointers matter.** Link consumers, memories, and sibling modules. The sidecar is a node in a graph, not a file in isolation.
+- **A stale sidecar is worse than a missing one.** Update whenever the source's role or load-bearing invariants change.
+
+---
+
+## Essay convention
+
+Long-form markdown files for working through ideas in prose — not tickets, not commit messages, not chat turns. Some thoughts need 400–800 words to settle.
+
+- Live alongside the project or in a dedicated `/essays/` directory.
+- Written by Claude, the human, or collaboratively.
+- **Lifecycle:** most essays are disposable — written to think, then discarded or distilled into memory. A few earn promotion to named docs. Disposability is a feature; quality is cheap to regenerate.
+- **Graduation:** moving an essay to a stable named doc is a deliberate act, not a drift.
+
+An insight from an essay often deserves distillation into a memory; a memory describing load-bearing behavior often deserves reflection in the relevant sidecar.
 
 ---
 
