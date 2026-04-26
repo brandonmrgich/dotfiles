@@ -50,13 +50,15 @@ stow -R <package>
 | -------- | ----------------------------------------------- | ---------------------------------------------- |
 | `claude` | `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh`, `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/environment/` | Claude Code config, statusline, skills, agents, environment map |
 | `git`    | `~/.gitconfig`                                  | User identity + LFS config                    |
-| `starship` | `~/starship.toml`                             | Prompt: directory + git branch/status/state   |
+| `starship` | `~/.config/starship.toml`                     | Prompt: directory + git branch/status/state   |
 | `tmux`   | `~/.config/tmux/tmux.conf`                      | Prefix C-a, vim-aware nav, vi copy mode       |
 | `zsh`    | `~/.zshrc`, `~/.zsh/`                           | Modular: env → omz → completion → aliases → functions → tmux |
 
 ## Invariants
 
 - Never edit files directly in `~` — edit the source in `~/dotfiles/<package>/` and the symlink propagates.
+- **Never create manual symlinks in `~`.** All symlinks must be created and owned by stow. A manually created symlink breaks stow's conflict detection and will be flagged as "not owned by stow" on the next `stow --simulate`. If you find one, remove it and re-run stow.
+- `starship.toml` lives at `starship/.config/starship.toml` — stow targets `~/.config/starship.toml`.
 - `starship.toml` format string drives the Claude Code statusline (`claude/.claude/statusline-command.sh`) — keep them in sync when changing prompt segments.
 - `~/.zshrc.local` is intentionally untracked — use it for machine-local overrides.
 
