@@ -210,12 +210,13 @@ Trigger: any time you hear yourself writing "// shouldn't happen", adding a `ste
 
 ## Artifact classes and front-matter
 
-Five artifact classes share the same YAML front-matter mechanism but answer different questions and live in different locations. Don't conflate them.
+Six artifact classes share the same YAML front-matter mechanism but answer different questions and live in different locations. Don't conflate them.
 
 | Class | Lives at | Front-matter | Purpose |
 |---|---|---|---|
 | **Memory** | `~/.claude/memory/` | `name`, `description`, `type`, `originSessionId` | Operational rules to recall during work (auto-memory retrieval by `description:` match) |
 | **Mantra** (doctrine) | `~/.claude/mantras/` | `title`, `status`, `adopted`, `origin` | Universal principles internalized via CLAUDE.md reference; never retrieved, always embodied |
+| **Idea** | `~/.claude/ideas/` | `title`, `created`, `status`, `tags`, `project?` | Pre-plan stash for future directions; managed by `idea-tracker` skill; matures into an essay or plan |
 | **Essay** | `~/.claude/essays/` or `<repo>/.claude/essays/` | `title`, `status`, `created`, `last-active`, `tags`, `anchors` | Decision artifacts with lifecycle (open → resolved → superseded) and forward/back anchors |
 | **Plan** | `<repo>/.claude/plans/<name>/MasterPlan.md` | `plan`, `status`, `from-essay`, `affects-docs`, `created` | Execution unit; back-references its essay, declares forward what docs it will touch |
 | **Doc** | `<repo>/docs/...` | `title`, `covers`, `last-verified`, `from-plan` | Current-state code description; tracked for staleness via `covers:` + `last-verified:` |
@@ -225,11 +226,13 @@ Plus commit footers (`Plan:`, `Task:`) — provenance metadata in commits, not f
 ### The anchor chain
 
 ```
-mantra → essay → plan → doc → code
-       (informs) (spawns) (guides) (documents)
+idea → essay → plan → doc → code
+     (matures) (spawns) (guides) (documents)
+              ↑
+          mantra (informs)
 ```
 
-Linear, one-way, acyclic. Children point to parents (via `from-essay:`, `from-plan:`); parents declare children forward only when needed for verification (via `anchors.produced` on essays, `affects-docs:` on plans). Memories sit aside — operational rules, not part of the design history chain.
+Linear, one-way, acyclic. Children point to parents (via `from-essay:`, `from-plan:`); parents declare children forward only when needed for verification (via `anchors.produced` on essays, `affects-docs:` on plans). Ideas precede essays — most ideas mature into either an essay (when they need design discussion) or directly into a plan (when scope is already clear); the originating idea is archived with a pointer to the plan/essay it became. Memories sit aside — operational rules, not part of the design history chain.
 
 ### Three front-matter *purposes* across these classes
 
