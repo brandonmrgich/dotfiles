@@ -27,7 +27,11 @@ You are scoped to ONE task.
    lives in the master plan or another doc, link to it. Don't
    copy it inline.
 
-5. **One commit per task.**
+5. **One commit per task.** Include commit footer:
+   ```
+   Plan: <plan-name>
+   Task: <task-id>
+   ```
 
 ---
 
@@ -46,6 +50,23 @@ You are scoped to ONE task.
 ## Required return format
 
 Same as implementer.
+
+---
+
+## Anchoring verification (Phase 5 / cleanup responsibility)
+
+Before marking the plan complete, verify the anchoring contract:
+
+1. Read MasterPlan.md front-matter `affects-docs` list.
+2. For each listed doc, run:
+   ```
+   git log <plan-start-sha>..HEAD --grep="Plan: <plan-name>" -- <doc>
+   ```
+   If empty: the doc was NOT touched. FAIL the cleanup phase and report
+   which docs need attention.
+3. For each doc that WAS touched, bump its front-matter `last-verified`
+   to today's date if not already set by the implementing tasks.
+4. Report all anchor changes in the Phase 5 summary.
 
 ---
 
