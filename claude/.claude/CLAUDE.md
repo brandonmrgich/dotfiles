@@ -212,6 +212,8 @@ Trigger: any time you hear yourself writing "// shouldn't happen", adding a `ste
 
 Six artifact classes share the same YAML front-matter mechanism but answer different questions and live in different locations. Don't conflate them.
 
+> **Rationale for this taxonomy lives in `~/.claude/essays/cross-claude-mantras-and-skills-integration.md`.** Read before proposing structural changes — that essay records why six classes (not five), why mantras separated from essays, and why the anchor chain is shaped the way it is.
+
 | Class | Lives at | Front-matter | Purpose |
 |---|---|---|---|
 | **Memory** | `~/.claude/memory/` | `name`, `description`, `type`, `originSessionId` | Operational rules to recall during work (auto-memory retrieval by `description:` match) |
