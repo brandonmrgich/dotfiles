@@ -95,6 +95,21 @@ regardless of what the implementer claims.
 For tasks that include a compliance checklist, verify each checklist item
 independently — do not trust that they were checked.
 
+### Step 4b — Anchor verification (final audit only)
+
+When auditing a completed plan (not mid-plan task audits):
+
+1. Read `affects-docs` from MasterPlan.md front-matter.
+2. For each listed doc, confirm it was touched in commits bearing `Plan: <plan-name>`:
+   ```
+   git log <plan-start-sha>..HEAD --grep="Plan: <plan-name>" -- <doc>
+   ```
+3. Confirm each touched doc has a `last-verified` date newer than the plan's `created` date.
+4. Include an "Anchor verification" section in the audit report:
+   - Docs touched (with commit count)
+   - Docs not touched
+   - Front-matter inconsistencies
+
 ### Step 5 — Master plan alignment check
 Beyond the task's own criteria, verify alignment with the master plan:
 1. Does the implementation respect the architectural decisions in the plan?

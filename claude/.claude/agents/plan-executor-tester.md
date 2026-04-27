@@ -30,7 +30,11 @@ implement application code beyond what the task explicitly requires.
    (likely in `tests/e2e/helpers/` or similar), reuse them. Do
    not duplicate test infrastructure.
 
-5. **One commit per task.** Same as the implementer.
+5. **One commit per task.** Same as the implementer. Include commit footer:
+   ```
+   Plan: <plan-name>
+   Task: <task-id>
+   ```
 
 ---
 

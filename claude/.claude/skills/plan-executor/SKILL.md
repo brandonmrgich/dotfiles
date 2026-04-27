@@ -131,6 +131,46 @@ state and logs that should not be committed.
 
 ---
 
+## Commit footer convention
+
+Every commit made during plan execution MUST include footers identifying the plan
+and the current task. Use git's standard footer format (blank line before footers):
+
+```
+git commit -m "feat(scope): summary
+
+Body text describing the change.
+
+Plan: <plan-name>
+Task: <task-id>"
+```
+
+This makes plan attribution greppable from `git log` and feeds the doc-freshness
+skill's analysis. Tag every commit, including merge commits.
+
+---
+
+## Plan front-matter and affects-docs
+
+Plans declare which docs they expect to update via the `affects-docs` field in
+MasterPlan.md front-matter:
+
+```yaml
+---
+plan: <name>
+status: in-progress | completed | abandoned
+affects-docs:
+  - docs/05-admin.md
+  - docs/04-backend.md
+created: <ISO date>
+---
+```
+
+The plan-executor-documenter sub-skill verifies these docs were touched (have new
+commits with the plan footer) before plan completion.
+
+---
+
 ## Multi-plan awareness
 
 Multiple plans may exist in the same project simultaneously. Each plan has its
