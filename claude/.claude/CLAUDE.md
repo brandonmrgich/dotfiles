@@ -47,6 +47,19 @@ For multi-step operations, emit lightweight progress:
 
 ---
 
+## Dotfiles workflow
+
+The `~/.claude/` tree is managed by GNU Stow from `~/dotfiles/claude/.claude/`. When adding, removing, or restructuring anything under `~/.claude/` or any other stow-managed path under `~/dotfiles/`:
+
+- **Never create symlinks manually with `ln -s` or `ln -sf`.** Stow owns the symlinks. Manual symlinks break stow's conflict detection and will surface as "not owned by stow" on the next `stow --simulate`.
+- Edit the source file at `~/dotfiles/<package>/<path>`, not the runtime symlink at `~/<path>`.
+- After adding or removing a tracked path: run `cd ~/dotfiles && stow <package>` (or `stow -R <package>` to restow). Verify with `ls -la ~/<path>` — should show a symlink.
+- This applies even when the primary working directory is a different repo. If you're touching anything under `~/.claude/` or `~/dotfiles/`, this rule fires.
+
+Full conventions in `~/dotfiles/CLAUDE.md`.
+
+---
+
 ## Sidecar conventions
 
 Every non-trivial source file should have a sibling `.claude` sidecar
@@ -153,6 +166,68 @@ Long-form markdown files for working through ideas in prose — not tickets, not
 - **Graduation:** moving an essay to a stable named doc is a deliberate act, not a drift.
 
 An insight from an essay often deserves distillation into a memory; a memory describing load-bearing behavior often deserves reflection in the relevant sidecar.
+
+---
+
+## Design doctrines (mantras)
+
+Load-bearing principles internalized as mantras — applied on every shape decision without retrieval. "Doctrine" and "mantra" are interchangeable; full text lives at `~/.claude/mantras/<title>.md`.
+
+### Make state honest
+
+The data shape of the system should match what's actually true about reality at the point of use. Four failure modes:
+
+- **Wider than reality** — type carries a `Maybe`/`NULL` the local site has already ruled out. Alarm: "shouldn't happen by construction."
+- **Narrower than reality** — wire throws away data the producer already had. Alarm: "B can re-derive this from A's output."
+- **Inventing reality** — naming a non-problem as a recovery scenario. Alarm: "stuck-state recovery."
+- **Fragmented** — two representations for one truth that drift and create bugs at the seam.
+
+The fix is always the same: change the shape, not the comment or the adapter layer.
+
+### Eliminate, don't paper over
+
+When code feels contorted — adding adapters, translation helpers, step counters, defer-until-later branches, defensive comments — the discomfort is information about the shape, not noise to suppress. The remedy is structural.
+
+**The license: I own the whole system.** Every contract, both sides. The diagnostic before any patch: does this invariant let me *delete* code? If yes, deleting is the work. Patching without deleting is a smell. When two components feel out of phase, reshape one or both until the translation falls away.
+
+Trigger: any time you hear yourself writing "// shouldn't happen", adding a `step` counter, deferring a decision to a later layer, or reaching for a translation helper — stop. The shape is wrong.
+
+---
+
+## Artifact classes and front-matter
+
+Five artifact classes share the same YAML front-matter mechanism but answer different questions and live in different locations. Don't conflate them.
+
+| Class | Lives at | Front-matter | Purpose |
+|---|---|---|---|
+| **Memory** | `~/.claude/memory/` | `name`, `description`, `type`, `originSessionId` | Operational rules to recall during work (auto-memory retrieval by `description:` match) |
+| **Mantra** (doctrine) | `~/.claude/mantras/` | `title`, `status`, `adopted`, `origin` | Universal principles internalized via CLAUDE.md reference; never retrieved, always embodied |
+| **Essay** | `~/.claude/essays/` or `<repo>/.claude/essays/` | `title`, `status`, `created`, `last-active`, `tags`, `anchors` | Decision artifacts with lifecycle (open → resolved → superseded) and forward/back anchors |
+| **Plan** | `<repo>/.claude/plans/<name>/MasterPlan.md` | `plan`, `status`, `from-essay`, `affects-docs`, `created` | Execution unit; back-references its essay, declares forward what docs it will touch |
+| **Doc** | `<repo>/docs/...` | `title`, `covers`, `last-verified`, `from-plan` | Current-state code description; tracked for staleness via `covers:` + `last-verified:` |
+
+Plus commit footers (`Plan:`, `Task:`) — provenance metadata in commits, not front-matter. See `~/.claude/skills/github/SKILL.md` for syntax.
+
+### The anchor chain
+
+```
+mantra → essay → plan → doc → code
+       (informs) (spawns) (guides) (documents)
+```
+
+Linear, one-way, acyclic. Children point to parents (via `from-essay:`, `from-plan:`); parents declare children forward only when needed for verification (via `anchors.produced` on essays, `affects-docs:` on plans). Memories sit aside — operational rules, not part of the design history chain.
+
+### Three front-matter *purposes* across these classes
+
+| Purpose | Fields | Question answered |
+|---|---|---|
+| **Retrieval / lifecycle** | `description`, `tags`, `status`, `last-active` | How is this artifact found and what state is it in? |
+| **Provenance** | `from-essay`, `from-plan`, `affects-docs`, `anchors`, commit footers | Where did this come from / what did it produce? |
+| **Staleness** | `covers`, `last-verified` | Is this doc still true about the code? |
+
+Apply *make state honest*: don't add fields an artifact doesn't need. A mantra doesn't have `anchors`, an essay doesn't have `covers:`, a plan doesn't have `last-verified:`. The schema for each class is exactly what that class needs — no more.
+
+See `~/.claude/references/plan-system.md` for the canonical filesystem layout and gitignore rules.
 
 ---
 
