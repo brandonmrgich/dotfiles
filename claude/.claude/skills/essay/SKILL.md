@@ -33,11 +33,20 @@ A good essay entry does NOT capture:
 
 ## Storage
 
-- **User-wide:** `~/.claude/essays/<slug>.md`
-- **Project-local:** `<repo>/.claude/essays/<slug>.md`
+- **User-wide:** `~/.claude/essays/<slug>.md` (default)
+- **Project-local:** `<repo>/.claude/essays/<slug>.md` (rare exception)
 
-Routing rule: if the essay's anchors point at any artifact in a specific repo
-(plans, docs, code), it's project-local. Otherwise it's user-wide. When in doubt, ask.
+**Default is user-wide.** Essays capture reasoning — reasoning is portable. The essay
+lives in `~/.claude/essays/` regardless of which project prompted the thinking.
+
+The plan or doc produced by an essay is what attaches to the project. When an essay
+produces a plan, the plan goes in `<repo>/.claude/plans/<plan-name>/` and its
+MasterPlan.md carries `from-essay: <essay-slug>` in its front-matter. This is how the
+essay-to-project connection is made — through the artifact, not the essay's location.
+
+**Exception — project-local essays:** only when the essay describes reasoning that is
+genuinely specific to one repo's internals and would be meaningless outside it (e.g.,
+a migration decision tied to a specific schema). When in doubt, default user-wide and ask.
 
 The slug is kebab-case derived from the essay title.
 
@@ -167,9 +176,17 @@ DO NOT offer an essay when:
 
 ## Integration with anchoring
 
-When an essay produces a plan or doc:
-1. The essay's `anchors.produced` is updated to include the new artifact's path
-2. The artifact gets `from-essay: <essay-path>` in its front-matter
+**Essay → plan → project** is the canonical flow:
+
+1. Reasoning lives in the essay (user-wide, portable)
+2. When the essay produces a plan, the plan goes in `<repo>/.claude/plans/<plan-name>/`
+3. The plan's MasterPlan.md carries `from-essay: <essay-slug>` in front-matter
+4. The essay's `anchors.produced` lists the plan path
+5. This is how essays attach to projects — through the plan artifact, not the essay's location
+
+When an essay produces a doc directly (rare):
+1. The doc gets `from-essay: <essay-slug>` in its front-matter
+2. The essay's `anchors.produced` lists the doc path
 
 When essays reference each other:
 1. The newer essay's `anchors.references` lists the older essay slug
