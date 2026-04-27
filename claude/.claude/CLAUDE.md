@@ -24,6 +24,20 @@ Before acting on any request:
 - Never scan the full project or docs directory unprompted.
 - "Inspect relevant context" means targeted reads — not exhaustive ones.
 
+## Tool selection
+
+Choose dedicated tools over Bash. Each Bash invocation costs the user a permission prompt — bulk read/move/list operations via Bash spam approvals.
+
+| Task | Use | Not |
+|---|---|---|
+| Read a file | `Read` | `cat`, `head`, `tail`, `less` |
+| Search file contents | `Grep` | `grep`, `rg` |
+| Find files by name | `Glob` | `find`, `ls` (when listing) |
+| Edit a file | `Edit` | `sed`, `awk`, redirected `echo` |
+| Write a new file | `Write` | `cat <<EOF`, `echo >` |
+
+Reserve Bash for: filesystem mutations (`mv`, `cp`, `mkdir`, `rm`), git operations, network calls, process management, running scripts. If a dedicated tool fits, the dedicated tool wins — even when Bash would be one line.
+
 ## Debugging behavior
 
 - Ground diagnosis in observable evidence: logs, error messages, reproduction steps.
