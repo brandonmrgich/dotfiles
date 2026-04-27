@@ -214,6 +214,9 @@ in the current project, so execution resumes across sessions.
 **Auditing:** plan-executor invokes plan-auditor only on demand mid-plan,
 automatically once at plan completion.
 
+See `~/.claude/references/plan-system.md` for canonical filesystem layout, gitignore rules, and multi-plan/worktree conventions.
+See `~/.claude/references/console-discipline.md` for output rules (when to write to file vs print to chat).
+
 ---
 
 ## Environment Map

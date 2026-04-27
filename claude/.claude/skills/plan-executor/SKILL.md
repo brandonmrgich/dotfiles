@@ -22,11 +22,10 @@ You do NOT implement tasks yourself. You dispatch sub-agents.
 2. **Dispatch-and-collect.** Spawn a sub-agent via the Task tool, wait
    for its return, record the outcome, then decide the next move.
 
-3. **Stop and ask on non-trivial failure.** Trivial = a single command
-   produced unexpected output but the sub-agent recovered. Non-trivial
-   = the sub-agent could not complete the task, returned an error,
-   left the working tree dirty in an unexpected way, or reports
-   ambiguity. On non-trivial failure: stop, summarize, ask the user.
+3. **Stop and ask on non-trivial failure.** See the failure-calibration
+   table in the "Phase 3 — Decide next action" section. A trivial failure
+   is one a fresh agent invocation can deterministically fix; non-trivial
+   means retrying risks compounding the problem.
 
 4. **Audit on demand mid-plan, automatically at completion.** Do not
    invoke the plan-auditor between every task unless the user asks.
@@ -77,6 +76,9 @@ If any required input is missing in Mode A, ask the user. Do not guess.
 ---
 
 ## Project-local state
+
+See `~/.claude/references/plan-system.md` for the canonical filesystem layout,
+gitignore rules, and multi-plan/worktree conventions.
 
 Create and maintain `.claude/plan-states/<plan-name>.json` in the current
 project root (NOT in the user-wide skills directory). The `<plan-name>` is
@@ -217,25 +219,39 @@ After each sub-agent returns:
   under a doc's `covers` paths (see the `doc-freshness` skill). If so, note in the
   plan log that relevant docs may need their `last-verified` bumped. Surface this
   as a recommendation to the user — do not bump automatically.
-- **Sub-agent reports a non-trivial failure:** Halt. Summarize what
-  failed and why. Ask the user how to proceed (retry, skip, abort,
-  or hand off to manual).
-- **Sub-agent reports completion but deliverables look wrong:**
-  Halt and surface the discrepancy. Do not auto-retry.
-- **Sub-agent reports completion but commit was not made:** Halt.
-  The plan requires one commit per task; missing commit is a fail.
+- **Sub-agent reports failure:** Apply the failure-calibration table below.
+
+### Failure-calibration table
+
+| Failure type | Verdict | Rationale |
+|---|---|---|
+| Single test fails, fix is obvious from the error | Trivial — agent retries | Self-correctable; halting wastes a roundtrip |
+| Lint/format violation | Trivial — agent retries | Mechanical; deterministic fix |
+| File path or import not found in fresh agent context | Trivial — agent retries with corrected path | Often a context-load miss, not a real failure |
+| Test failure with non-obvious cause | Non-trivial — halt | Risk of compounding wrong fix |
+| Build error spanning multiple files | Non-trivial — halt | Cross-file blast radius needs human read |
+| Auth/permission failure (push, gh) | Non-trivial — halt | Can't be fixed by retry; needs operator action |
+| Agent reports "uncertain" or asks a question | Non-trivial — halt | Explicit signal — surface it |
+| Deliverables missing or wrong | Non-trivial — halt | Auto-retry risks producing more wrong output |
+| Audit verdict: fail | Non-trivial — halt | The audit is the calibration |
+
+On non-trivial failure: halt, summarize what failed, ask the user how to proceed
+(retry, skip, abort, or hand off to manual). Do not auto-retry.
 
 ### Phase 4 — Plan completion
 
 When the last task in the plan is complete:
 
+See `~/.claude/references/console-discipline.md` for output rules.
+
 1. Automatically invoke the plan-auditor skill on the entire plan.
    Dispatch one final audit sub-agent that audits each completed
    task in sequence.
 2. Aggregate audit verdicts into a final report.
-3. Write the report to `.claude/plan-completion-report.md`.
-4. Print a summary to chat: total tasks, total commits, audit results,
-   any conditional passes or follow-ups.
+3. Write summary to `.claude/plan-states/<plan-name>-summary.md`
+   and audit verdict to `.claude/plan-states/<plan-name>-audit.md`.
+4. Print to chat: 2–3 lines — verdict, file paths, next action.
+   Example: "Plan complete. 8/8 tasks passed. Full report: .claude/plan-states/my-plan-summary.md"
 5. Update state file with `status: "completed"` at the top level.
 
 ### Phase 5 — Cleanup (requires explicit user consent)
