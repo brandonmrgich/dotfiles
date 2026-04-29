@@ -192,6 +192,19 @@ When essays reference each other:
 1. The newer essay's `anchors.references` lists the older essay slug
 2. The older essay does NOT need updating (one-way to avoid cascades)
 
+### The `ready-for-plan` tag
+
+When an essay's design decisions have settled but no plan or code yet exists, add `ready-for-plan` to its front-matter `tags`. This marks the essay as a planning candidate without bending the status taxonomy — `resolved` requires artifacts produced, and the plan is not yet produced, so the essay's `status` stays `open` while the tag carries the readiness signal.
+
+Discovery: query mode matches the tag. `find essays tagged ready-for-plan` (or any phrasing about the planning queue, planning candidates, queued essays, essays awaiting a plan) surfaces every tagged essay across `~/.claude/essays/` and any in-scope project-local essay tree.
+
+When a plan is actually created from the essay:
+1. Remove `ready-for-plan` from `tags`.
+2. Add the plan path to the essay's `anchors.produced`.
+3. Consider whether `status` should advance to `resolved`.
+
+Plan creation from a tagged essay is always a deliberate, separate invocation — never auto-create plans from tagged essays.
+
 ---
 
 ## Writing principles
