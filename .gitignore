@@ -1,7 +1,8 @@
 # Claude Code runtime artifacts — never commit
 .claude/plan-states/
 .claude/plan-completion-report.md
-.claude/plans/
+.claude/plans/*
+!.claude/plans/skills-trim-and-discipline/
 .claude/settings.local.json
 
 .DS_Store
