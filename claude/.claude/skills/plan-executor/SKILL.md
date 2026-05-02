@@ -16,175 +16,68 @@ You do NOT implement tasks yourself. You dispatch sub-agents.
 
 ## Operating principles
 
-1. **Sequential execution.** Run one task at a time. Do not parallelize
-   even when tasks are independent. Predictability over speed.
-
+1. **Sequential execution.** One task at a time. No parallelism even
+   when tasks are independent. Predictability over speed.
 2. **Dispatch-and-collect.** Spawn a sub-agent via the Task tool, wait
-   for its return, record the outcome, then decide the next move.
-
-3. **Stop and ask on non-trivial failure.** See the failure-calibration
-   table in the "Phase 3 — Decide next action" section. A trivial failure
-   is one a fresh agent invocation can deterministically fix; non-trivial
-   means retrying risks compounding the problem.
-
-4. **Audit on demand mid-plan, automatically at completion.** Do not
-   invoke the plan-auditor between every task unless the user asks.
-   When the entire plan reaches its terminal task, automatically
-   invoke the plan-auditor for a final pass.
-
-5. **Persist state to disk.** Maintain a state file in the project's
-   `.claude/` directory so execution can resume in a new session.
-
-6. **The master plan is authoritative.** When task files conflict
-   with the master plan, surface the conflict and ask before proceeding.
-
-7. **Plans and tasks must cross-reference.** Every task file must
-   reference its parent master plan by path. Every master plan must
-   list its task files by path. Generated tasks must follow this
-   convention. The cross-reference is what allows the auditor and
-   future sessions to navigate the plan structure.
-
-8. **Clean up artifacts on completion with user consent.** After
-   the entire plan completes and the final audit passes, offer to
-   remove the project-local plan, task files, state file, and logs.
-   Only the commits made during execution remain in the repository
-   history. The user must explicitly confirm cleanup. Default is
-   no cleanup unless explicitly approved.
+   for return, record outcome, decide next move.
+3. **Stop and ask on non-trivial failure.** Trivial failures get one
+   retry; non-trivial failures halt and ask. Decision matrix:
+   `~/.claude/references/plan-failure-handling.md`.
+4. **Audit on demand mid-plan, automatically at completion.** Don't
+   invoke plan-auditor between tasks unless asked. Auto-invoke at the
+   terminal task.
+5. **Persist state to disk.** State file at
+   `.claude/plan-states/<plan-name>.json` lets execution resume across
+   sessions.
+6. **Master plan is authoritative.** Task files conflicting with the
+   master plan → surface and ask before proceeding.
+7. **Plans and tasks must cross-reference.** Each task references its
+   master plan by path; each master plan lists its task files.
+8. **Cleanup requires explicit consent.** After plan + final audit,
+   offer to remove generated artifacts. Default: no cleanup. Commits
+   remain in git history regardless.
 
 ---
 
 ## Required inputs
 
-Before starting, you need one of two input modes:
+Two input modes:
 
-### Mode A — Existing plan and tasks
-- Path to the master plan file (already written)
-- Path to the tasks directory (already populated with numbered task files)
-- Confirmation of the working branch (default: current branch)
+- **Mode A — Existing plan and tasks.** Master plan path, tasks
+  directory path, working branch (default: current branch).
+- **Mode B — Generate plan and/or tasks first.** User provides only
+  a goal. Generate per `~/.claude/references/plan-generation.md`
+  (clarify goal, generate master plan, generate task files,
+  cross-reference, user approval, artifact tracking). **Read it
+  before proceeding.** Do not improvise.
 
-### Mode B — Generate plan and/or tasks first
-The user provides only a goal description. You generate the plan,
-the task files, or both, then proceed to execute. See the section
-"Plan and task generation" below for the procedure.
-
-If the user's request is ambiguous about which mode applies, ask:
-"Do you have a master plan and task files ready, or would you like
-me to generate them first?"
-
-If any required input is missing in Mode A, ask the user. Do not guess.
+If the mode is ambiguous, ask: "Do you have a master plan and task
+files ready, or would you like me to generate them first?" If a
+required Mode A input is missing, ask. Do not guess.
 
 ---
 
-## Project-local state
+## Project-local state, layout, and conventions
 
-See `~/.claude/references/plan-system.md` for the canonical filesystem layout,
-gitignore rules, and multi-plan/worktree conventions.
+Filesystem layout, gitignore rules, multi-plan/worktree conventions,
+and the **state file schema** (JSON example, field semantics, status
+taxonomies): `~/.claude/references/plan-system.md`. The state file
+lives at `.claude/plan-states/<plan-name>.json`; a sibling `.log`
+records events.
 
-Create and maintain `.claude/plan-states/<plan-name>.json` in the current
-project root (NOT in the user-wide skills directory). The `<plan-name>` is
-derived from the plan directory name (e.g., `.claude/plans/admin-form-overhaul/`
-→ plan name is `admin-form-overhaul`, state file is
-`.claude/plan-states/admin-form-overhaul.json`). Schema:
+**Commit footers.** Every commit during plan execution MUST include
+`Plan:` and `Task:` footers. Full syntax in
+`~/.claude/skills/github/SKILL.md`.
 
-```json
-{
-    "master_plan_path": "apps/admin/docs/refactor/MasterPlan.md",
-    "tasks_dir": "apps/admin/docs/refactor/tasks",
-    "branch": "refactor/forms-v2",
-    "started_at": "2026-04-25T18:30:00Z",
-    "artifacts_generated_by_orchestrator": false,
-    "cleanup_status": "not_offered",
-    "tasks": [
-        {
-            "id": "00-discovery",
-            "file": "00-discovery.md",
-            "status": "complete",
-            "subagent_type": "discovery",
-            "started_at": "...",
-            "completed_at": "...",
-            "commit_sha": "abc1234",
-            "summary": "Inventory complete. 7 forms found, 4 mutation hooks orphaned.",
-            "audit_status": "not_run"
-        },
-        {
-            "id": "01-form-state-machine",
-            "file": "01-form-state-machine.md",
-            "status": "in_progress",
-            "subagent_type": "implementer",
-            "started_at": "..."
-        }
-    ],
-    "current_task_index": 1,
-    "halt_reason": null
-}
-```
+**`affects-docs`.** Plans declare which docs they expect to update via
+`affects-docs` in MasterPlan.md front-matter; plan-executor-documenter
+verifies those docs were touched before plan completion. See CLAUDE.md
+§ Artifact classes.
 
-Status values: `pending | in_progress | complete | failed | skipped`
-Audit status values: `not_run | pass | conditional_pass | fail | escalated`
-
-Also maintain `.claude/plan-states/<plan-name>.log` — append a one-line entry
-per significant event (dispatch, return, failure, audit, halt). The log and
-state file live together under `.claude/plan-states/`.
-
-Add `.claude/plan-states/` to `.gitignore` — the directory holds runtime
-state and logs that should not be committed.
-
----
-
-## Commit footer convention
-
-Every commit made during plan execution MUST include footers identifying the plan
-and the current task. Use git's standard footer format (blank line before footers):
-
-```
-git commit -m "feat(scope): summary
-
-Body text describing the change.
-
-Plan: <plan-name>
-Task: <task-id>"
-```
-
-This makes plan attribution greppable from `git log` and feeds the doc-freshness
-skill's analysis. Tag every commit, including merge commits.
-
----
-
-## Plan front-matter and affects-docs
-
-Plans declare which docs they expect to update via the `affects-docs` field in
-MasterPlan.md front-matter:
-
-```yaml
----
-plan: <name>
-status: in-progress | completed | abandoned
-affects-docs:
-  - docs/05-admin.md
-  - docs/04-backend.md
-created: <ISO date>
----
-```
-
-The plan-executor-documenter sub-skill verifies these docs were touched (have new
-commits with the plan footer) before plan completion.
-
----
-
-## Multi-plan awareness
-
-Multiple plans may exist in the same project simultaneously. Each plan has its
-own state file at `.claude/plan-states/<plan-name>.json`. The plan name is
-derived from the plan directory name (e.g., `.claude/plans/admin-form-overhaul/`
-→ state at `.claude/plan-states/admin-form-overhaul.json`).
-
-When asked to "resume the plan" without specifying a name, list all active plan
-states (any non-completed JSON in `.claude/plan-states/`) and ask the user which
-to resume. Never assume.
-
-When starting a new plan, check for existing state files in `.claude/plan-states/`.
-If another plan is already active (status not "completed"), surface it and ask the
-user whether to run plans concurrently (allowed) or whether to pause the other first.
+**Multi-plan.** Multiple plans may run simultaneously, each with its
+own state file. On "resume the plan" without a name → list all
+non-completed states and ask. On new-plan start, surface any other
+active plan and ask whether to run concurrently or pause the other.
 
 ---
 
@@ -213,34 +106,26 @@ user whether to run plans concurrently (allowed) or whether to pause the other f
 
 For each task in order:
 
-1. Determine the appropriate agent type from the task's content:
-    - `plan-executor-discovery` — inventory, audit, mapping, surveying
-    - `plan-executor-implementer` — writing application code, components, hooks
-    - `plan-executor-tester` — writing unit, integration, or E2E tests
-    - `plan-executor-documenter` — writing markdown docs, READMEs, ADRs
-    - `general-purpose` — fallback for anything that doesn't cleanly
-      fit the above (this is a Claude Code built-in agent)
+1. Determine the agent type from task content:
+    - `plan-executor-discovery` — inventory, audit, mapping
+    - `plan-executor-implementer` — application code, components, hooks
+    - `plan-executor-tester` — unit, integration, E2E tests
+    - `plan-executor-documenter` — markdown docs, READMEs, ADRs
+    - `general-purpose` — Claude Code built-in fallback
 
-2. Update state file: mark task as `in_progress`, write log entry.
+   These are REGISTERED CLAUDE CODE AGENTS at `~/.claude/agents/<name>.md`,
+   not skills. The Task tool fails with "Agent type not found" on
+   unregistered names.
 
-3. Dispatch via the Task tool with:
-    - `subagent_type` set to one of: `plan-executor-implementer`,
-      `plan-executor-tester`, `plan-executor-documenter`,
-      `plan-executor-discovery`, or `general-purpose` (fallback).
-      These are REGISTERED CLAUDE CODE AGENTS at `~/.claude/agents/<name>.md`,
-      not skills. The Task tool will fail with "Agent type not found" if
-      you pass an unregistered name.
-    - `prompt` containing:
-      - The full content of the task file
-      - The path to the master plan (for the agent to consult)
-      - The working branch name
-      - An instruction to produce exactly the deliverables specified
-        in the task file, no more
-      - An instruction to return the structured summary specified in
-        "Required sub-agent return format" below
-    - A note that specialist skills (DDEX, Next.js, etc.) may activate
-      based on file paths or prompt content; the agent should follow
-      specialist guidance when triggered
+2. Update state file: mark task `in_progress`; write log entry.
+
+3. Dispatch via the Task tool. The `prompt` must contain: the full task
+   file, the master plan path, the working branch name, an instruction
+   to produce exactly the deliverables specified (no more), and an
+   instruction to return the structured summary defined below.
+   Specialist skills (DDEX, Next.js, etc.) may activate inside the
+   sub-agent based on file paths or prompt content — the agent follows
+   specialist guidance when triggered.
 
 4. Wait for the sub-agent to return.
 
@@ -249,34 +134,18 @@ For each task in order:
 
 ### Phase 3 — Decide next action
 
-After each sub-agent returns:
+After each sub-agent returns, apply the calibration at
+`~/.claude/references/plan-failure-handling.md`:
 
-- **Sub-agent reports success and produced expected deliverables:**
-  Mark task complete. Append log entry. Optionally offer the user
-  an audit checkpoint: "Task <id> complete. Run plan-auditor before
-  continuing? (yes/no/skip-all)"
-  After marking a task complete, check if any files committed in this task fall
-  under a doc's `covers` paths (see the `doc-freshness` skill). If so, note in the
-  plan log that relevant docs may need their `last-verified` bumped. Surface this
-  as a recommendation to the user — do not bump automatically.
-- **Sub-agent reports failure:** Apply the failure-calibration table below.
+- Success + expected deliverables → mark complete, optionally offer
+  audit checkpoint, check `covers:` paths against committed files
+  for `last-verified` recommendations.
+- Failure → consult the failure-calibration table. Trivial → agent
+  retries (one retry). Non-trivial → halt, summarize, ask the user.
 
-### Failure-calibration table
-
-| Failure type | Verdict | Rationale |
-|---|---|---|
-| Single test fails, fix is obvious from the error | Trivial — agent retries | Self-correctable; halting wastes a roundtrip |
-| Lint/format violation | Trivial — agent retries | Mechanical; deterministic fix |
-| File path or import not found in fresh agent context | Trivial — agent retries with corrected path | Often a context-load miss, not a real failure |
-| Test failure with non-obvious cause | Non-trivial — halt | Risk of compounding wrong fix |
-| Build error spanning multiple files | Non-trivial — halt | Cross-file blast radius needs human read |
-| Auth/permission failure (push, gh) | Non-trivial — halt | Can't be fixed by retry; needs operator action |
-| Agent reports "uncertain" or asks a question | Non-trivial — halt | Explicit signal — surface it |
-| Deliverables missing or wrong | Non-trivial — halt | Auto-retry risks producing more wrong output |
-| Audit verdict: fail | Non-trivial — halt | The audit is the calibration |
-
-On non-trivial failure: halt, summarize what failed, ask the user how to proceed
-(retry, skip, abort, or hand off to manual). Do not auto-retry.
+The audit-checkpoint flow (per-task opt-in, "audit between every
+task" mode, and the automatic final audit) is also documented in
+that reference.
 
 ### Phase 4 — Plan completion
 
@@ -296,42 +165,12 @@ See `~/.claude/references/console-discipline.md` for output rules.
 
 ### Phase 5 — Cleanup (requires explicit user consent)
 
-Only run Phase 5 if the final audit verdict is PASS or CONDITIONAL PASS.
-If the final audit is FAIL or ESCALATED, skip Phase 5 entirely and
-leave all artifacts in place for the user to address.
-
-1. Print to chat: a list of every artifact that would be removed.
-   This includes:
-   - The master plan file (if generated by this orchestrator in Mode B)
-   - The tasks directory and all task files (if generated by this
-     orchestrator in Mode B)
-   - `.claude/plan-states/<plan-name>.json`
-   - `.claude/plan-states/<plan-name>.log`
-   - `.claude/plan-completion-report.md` (offer to keep this one
-     separately — it is often worth retaining)
-   - Any audit reports written during this plan (typically under
-     `.claude/audits/` or alongside the tasks directory)
-
-2. Explicitly distinguish artifacts that were authored by the user
-   versus artifacts generated by the orchestrator. NEVER offer to
-   remove user-authored files. If the user provided the master plan
-   or tasks in Mode A, those are user-authored — they stay.
-
-3. Ask the user verbatim: "Plan complete. Remove project-local
-   execution artifacts now? (yes / no / keep-completion-report-only)"
-
-4. On `yes`: remove all listed artifacts.
-5. On `keep-completion-report-only`: remove everything except
-   `.claude/plan-completion-report.md`.
-6. On `no` or any other response: leave everything in place. Print
-   the artifact list as a record of what could be cleaned up later.
-
-7. After cleanup (or skipped cleanup), print a final summary line:
-   "Plan execution complete. <N> tasks executed, <N> commits made
-   on branch <branch>. Cleanup: <done | skipped | partial>."
-
-The commits made during execution are NEVER part of cleanup. The
-git history is the durable record of the plan's outcome.
+Only runs if the final audit verdict is PASS or CONDITIONAL PASS.
+On FAIL or ESCALATED, skip Phase 5 entirely and leave all artifacts
+in place. Full procedure (artifact list, user-authored vs
+orchestrator-generated distinction, verbatim consent prompt, final
+summary line): `~/.claude/references/plan-failure-handling.md`
+§ Phase 5 cleanup gate.
 
 ---
 
@@ -360,110 +199,22 @@ and halt for clarification.
 
 ## How the user invokes you
 
-Examples:
+Example phrasings: "Execute the plan at <path>", "Generate a plan to
+<goal>, then execute it", "Resume plan execution", "Run the next task",
+"Run the plan but ask me to audit between every task."
 
-> "Execute the plan at apps/admin/docs/refactor/MasterPlan.md.
->  Tasks are in apps/admin/docs/refactor/tasks/."
-
-> "Generate a plan to refactor the auth module, then execute it."
-
-> "I have a goal: migrate all forms in apps/admin to v2. Generate
->  the plan and tasks, then run them."
-
-> "Resume plan execution."
-
-> "Run the next task in the current plan."
-
-> "Run the plan but ask me to audit between every task."
-
-You handle these modes:
+Modes handled:
 
 1. **Mode A — Fresh start with existing plan/tasks** — initialize state,
    validate plan, dispatch task 0.
-2. **Mode B — Generate then execute** — generate plan and/or tasks per
-   the "Plan and task generation" section, get user approval, then
-   proceed as Mode A.
-3. **Resume** — read state file, confirm with user, dispatch next
-   pending task.
-4. **Run-next** — read state file, dispatch only the next task, then stop.
+2. **Mode B — Generate then execute** — generate per
+   `~/.claude/references/plan-generation.md`, get approval, then Mode A.
+3. **Resume** — read state file, confirm, dispatch next pending task.
+4. **Run-next** — read state file, dispatch only the next task, stop.
 
 If the user asks for "audit between every task", set an in-memory flag
-and invoke the plan-auditor after each task completes (still requiring
-explicit user confirmation to proceed past a failed audit).
-
----
-
-## Plan and task generation
-
-When invoked in Mode B (user provides a goal but no plan/tasks), you
-generate the artifacts before dispatching any sub-agent.
-
-### Step 1 — Clarify the goal
-Ask the user clarifying questions if any of these are unclear:
-- What is the desired end state?
-- What part of the codebase is in scope?
-- Are there constraints (no breaking changes, must run on single
-  branch, etc.)?
-- What's the rough size — single afternoon, multi-day, multi-week?
-
-### Step 2 — Generate the master plan
-Write the master plan to a path the user approves (default suggestion:
-`docs/plans/<short-name>-MasterPlan.md`).
-
-The master plan MUST include:
-- A "Project Vision" or "Objective" section
-- An architectural / structural overview
-- Constraints and standards
-- A "Task index" section listing every task file by path, with the
-  exact paths the orchestrator will generate in Step 3
-- A footer line: `Tasks for this plan: <tasks_dir>/` so any reader
-  knows where to find them
-
-### Step 3 — Generate the task files
-Write each task file under a directory the user approves (default
-suggestion: alongside the plan, in `<plan_dir>/tasks/`).
-
-Each task file MUST include:
-- A header with the task ID and name
-- A `## Context` section that **references the master plan by absolute
-  path** with a line like:
-  `Part of <absolute path to master plan>, Section <N>.`
-- `## Prerequisites` section listing prior task IDs by name
-- `## Scope`
-- `## Out of Scope`
-- `## Acceptance Criteria`
-- `## Validation Steps`
-- `## Deliverables` (always specifying exactly one commit and the
-  exact commit message format)
-
-### Step 4 — Cross-reference verification
-Before proceeding to execution:
-- Confirm every task file references the master plan path
-- Confirm the master plan's task index lists every generated task file
-- If a sub-agent type can be inferred from the task content, add a
-  `## Sub-agent type: <implementer|tester|documenter|discovery>` line
-  near the top of each task file
-
-### Step 5 — User approval
-Print to chat:
-- The master plan path
-- The full list of task file paths
-- The total task count
-- A one-line summary per task
-
-Then ask: "Generated <N> tasks. Review and approve before execution?
-(approve / show <task-id> / regenerate / cancel)"
-
-Only proceed to Phase 0 (initialize) once the user approves.
-
-On `cancel`: discard the generated plan and task files, do not
-write the state file, exit cleanly.
-
-### Step 6 — Track that artifacts are orchestrator-generated
-In `.claude/plan-states/<plan-name>.json`, set `"artifacts_generated_by_orchestrator": true`
-at the top level. This flag is what enables Phase 5 cleanup to safely
-remove generated files. Without this flag, Phase 5 will treat all
-files as user-authored and decline to remove them.
+and invoke plan-auditor after each task (still requiring explicit user
+confirmation past a failed audit).
 
 ---
 

@@ -83,3 +83,86 @@ Ignore `.claude/plan-states/`.
 
 **Monorepo**: same as single-project at the root. Per-package `.gitignore` only for
 package-specific artifacts.
+
+---
+
+## State file schema
+
+The orchestrator persists per-plan execution state to
+`.claude/plan-states/<plan-name>.json` so a new session can resume
+exactly where the previous one stopped. The plan name derives from
+the plan directory name (see § Layout above).
+
+```json
+{
+    "master_plan_path": "apps/admin/docs/refactor/MasterPlan.md",
+    "tasks_dir": "apps/admin/docs/refactor/tasks",
+    "branch": "refactor/forms-v2",
+    "started_at": "2026-04-25T18:30:00Z",
+    "artifacts_generated_by_orchestrator": false,
+    "cleanup_status": "not_offered",
+    "tasks": [
+        {
+            "id": "00-discovery",
+            "file": "00-discovery.md",
+            "status": "complete",
+            "subagent_type": "discovery",
+            "started_at": "...",
+            "completed_at": "...",
+            "commit_sha": "abc1234",
+            "summary": "Inventory complete. 7 forms found, 4 mutation hooks orphaned.",
+            "audit_status": "not_run"
+        },
+        {
+            "id": "01-form-state-machine",
+            "file": "01-form-state-machine.md",
+            "status": "in_progress",
+            "subagent_type": "implementer",
+            "started_at": "..."
+        }
+    ],
+    "current_task_index": 1,
+    "halt_reason": null
+}
+```
+
+Field semantics:
+
+- `master_plan_path`, `tasks_dir`, `branch` — what the plan
+  operates on. Captured at Phase 0 init.
+- `started_at` — ISO timestamp; first dispatch.
+- `artifacts_generated_by_orchestrator` — `true` only when the
+  orchestrator generated the plan/tasks itself in Mode B (see
+  `~/.claude/references/plan-generation.md` § Step 6). Gates
+  whether Phase 5 cleanup may remove the plan/tasks.
+- `cleanup_status` — `not_offered | offered | done | declined`.
+- `tasks[]` — one entry per task file, ordered by filename.
+- `current_task_index` — zero-based index into `tasks[]`.
+- `halt_reason` — populated when execution stops on non-trivial
+  failure; null otherwise.
+
+### Status taxonomies
+
+Per-task `status`:
+
+- `pending` — not yet dispatched.
+- `in_progress` — dispatched, sub-agent has not returned.
+- `complete` — sub-agent returned success, deliverables verified.
+- `failed` — sub-agent returned failure or did not produce deliverables.
+- `skipped` — user chose to skip this task explicitly.
+
+Per-task `audit_status`:
+
+- `not_run` — plan-auditor has not been invoked on this task.
+- `pass` — auditor verdict PASS.
+- `conditional_pass` — auditor verdict PASS with caveats.
+- `fail` — auditor verdict FAIL.
+- `escalated` — auditor refused to verdict; surfaced for user decision.
+
+### Per-plan log
+
+Alongside the JSON, the orchestrator maintains
+`.claude/plan-states/<plan-name>.log` — append-only, one line per
+significant event (dispatch, return, failure, audit, halt). The log
+is debug-grade, not authoritative; the JSON state file is the source
+of truth.
