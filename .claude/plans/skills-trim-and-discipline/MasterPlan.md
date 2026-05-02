@@ -141,69 +141,81 @@ before the next phase starts.
 
 ## Branching, PRs, and tagging
 
-**Cadence: per-phase.** Locked per user direction. One PR per phase
-(except Phase 0, which folds into Phase 1's PR).
+**Cadence: single-branch execution + one umbrella PR.** Updated per user
+direction post-setup-merge: "complete all this work on one branch."
 
-- **Setup PR (pre-plan, landed before Task 00 dispatches):**
-  Adds the gitignore exemption for this specific plan dir and tracks
-  the MasterPlan + task files in git. Branch:
-  `claude/skills-trim/setup`. Earns one MINOR tag bump on merge.
-- **Per-phase branches:** Each phase has its own branch off the latest
-  `main`:
-  - `claude/skills-trim/phase-1-claude-md-trims` (Tasks 00 baseline + 01–04)
-  - `claude/skills-trim/phase-2-skill-md-trims` (Tasks 05–13)
-  - `claude/skills-trim/phase-3-description-format` (Tasks 14–18)
-  - `claude/skills-trim/phase-4-pressure-testing` (Tasks 19–20)
-  - `claude/skills-trim/phase-5-discipline-skills` (Tasks 21–25)
-  - `claude/skills-trim/phase-6-ritual-skills` (Tasks 26–30)
-  - `claude/skills-trim/phase-7-existing-upgrades` (Tasks 31–32)
-  - `claude/skills-trim/phase-8-ergonomics` (Tasks 33–37)
-- **Within a phase branch:** Each task gets its own commit (preserving
-  surgical reverts within the branch). The audit-gate task at phase end
-  may also commit an audit report file under `audits/`. After all tasks
-  in the phase complete and the gate verdict is PASS, open the phase PR
-  into `main`.
-- **Per-phase PR cadence:** 8 phase PRs total. Each merge earns one
-  MINOR tag bump (auto-tag-on-main convention; see
-  `~/dotfiles/CLAUDE.md` §"Tagging and releases"). Tag message
-  references the plan name and phase number.
-- **Sync after each merge:** After each phase PR merges, fast-forward
-  the long-lived `claude/skills-trim-and-discipline` branch from `main`
-  so it stays current.
-- **Final umbrella PR (Phase 9 / Task 38):** Commits the essay
-  resolutions onto `claude/skills-trim-and-discipline` and opens the
-  umbrella PR. Body lists every phase PR by number with a one-line
-  description and links to the two source essays. **The user merges
-  this PR manually.** After merge, the user runs the **MAJOR** tag
-  bump per Task 38's instructions (the agent does not push tags).
+- **Execution branch:** `claude/skills-trim-and-discipline` off the
+  post-setup `main` (current top tag at start: v2.4). All phase work
+  commits to this single branch in order. No per-phase branches; no
+  per-phase PRs.
+- **Within the branch:** Each task gets its own commit (preserving
+  surgical reverts and a clean per-task history). Audit-gate tasks
+  also commit their audit report under `audits/`.
+- **Phase MINOR tags placed on the branch at phase completion.** After
+  the last task of a phase commits and the audit gate (if any) passes,
+  tag the latest phase commit with the next MINOR (v2.5 for Phase 1,
+  v2.6 for Phase 2, …). Push tags to origin as they are placed; the
+  remote has the full progression history regardless of when the
+  branch merges.
+- **No GitHub releases mid-plan.** Phase MINORs are tags only. Release
+  is created at v3.0 from the cumulative work.
+- **Final umbrella PR (Phase 9 / Task 38):** The closeout commit
+  (essay resolutions + Measured outcome appended to essay #9) is
+  the last commit on the branch. Open the umbrella PR
+  `claude/skills-trim-and-discipline → main` at this point. Body
+  lists every phase by number with a one-line description plus the
+  measured outcome and links to the two source essays.
+  **The user merges this PR manually.**
+- **MAJOR tag at closeout:** Place v3.0 on the closeout commit (the
+  last commit on the branch, before merge). After the user merges the
+  umbrella PR, the user creates the GitHub release against v3.0. The
+  agent does NOT create the release.
 
 ### Tag-bump summary
 
-| Stage | Tag bump |
+| Stage | Tag |
 |---|---|
-| Setup PR merged | 1 MINOR |
-| Phase 1–8 PRs merged | 8 × MINOR |
-| Umbrella PR (Phase 9) merged | 1 MAJOR (resets MINOR to 0) |
-| **Total** | **9 MINOR + 1 MAJOR** |
+| Setup PR merged (already landed) | v2.4 (already placed) |
+| Phase 1 audit PASS → tag latest phase 1 commit | v2.5 |
+| Phase 2 audit PASS → tag latest phase 2 commit | v2.6 |
+| Phase 3 audit PASS | v2.7 |
+| Phase 4 audit PASS | v2.8 |
+| Phase 5 audit PASS | v2.9 |
+| Phase 6 audit PASS | v2.10 |
+| Phase 7 complete (no gate; audit folds into Phase 8) | v2.11 |
+| Phase 8 audit PASS | v2.12 |
+| Phase 9 closeout commit | **v3.0** (before umbrella merge) |
+| **Total** | **8 MINOR + 1 MAJOR** placed during execution |
 
 ### Audit gates
 
-Tasks 04, 13, 18, 20, 25, 30, 37 are audit gates — they produce reports
-under `.claude/plans/skills-trim-and-discipline/audits/` and do not have
-their own PRs. The audit report commits onto the same phase branch as
-its preceding implementing tasks, so the phase PR includes the audit
-artifact. `plan-auditor` is invoked as a standalone skill mid-plan; the
-user (or plan-executor on demand) triggers it explicitly between phases.
-Each gate's verdict is reviewed before opening the phase PR; PASS gates
-the merge.
+Tasks 04, 13, 18, 20, 25, 30, 37 are audit gates. Each produces a
+report under `.claude/plans/skills-trim-and-discipline/audits/` (now
+tracked in git per the gitignore exemption) and commits the report on
+the same branch as its preceding implementing tasks. `plan-auditor`
+is invoked as a standalone skill between phases; the user (or
+plan-executor on demand) triggers it. The audit verdict gates the
+phase MINOR tag — PASS → place tag, continue. PARTIAL/FAIL → halt and
+surface to user before continuing.
 
 ### Per-task "Commit / PR" sections
 
 Each task file's "Commit / PR" section describes the **commit** content
-(message, scope). Under per-phase cadence, those commits aggregate into
-the phase PR — the per-task PR target listed in each task file is
-shorthand for "lands in the phase PR that targets `main`." Task content
-and sequencing are unchanged; only the PR boundary differs.
+(message, scope). Under single-branch execution, all commits aggregate
+into the umbrella PR; the per-task PR target listed in each task file
+is shorthand for "lands in the umbrella PR that targets `main`." Task
+content, sequencing, and audit gates are unchanged; only the PR
+boundary differs.
+
+### Audit report tracking
+
+Because the gitignore exemption makes
+`.claude/plans/skills-trim-and-discipline/` tracked, audit reports
+written under `audits/` are committed alongside the implementing tasks
+of the phase they validate. The audit-gate commit is conventionally
+the last commit of a phase, so the MINOR tag is placed on the audit
+commit (or on the last implementing commit if the audit phase has
+no gate, e.g., Phase 7).
 
 ## Constraints
 

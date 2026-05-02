@@ -51,9 +51,11 @@ becomes uncheckable.
    table, cross-ref graph, always-loaded baseline, projection-table source
    (cite essay #9 §"Compound savings projection") for each scenario
    (A–F).
-9. **No commit.** `.claude/plans/` is gitignored in dotfiles, so the
-   audit file lives only on disk. Subsequent tasks read it directly
-   from `~/dotfiles/.claude/plans/skills-trim-and-discipline/audits/00-baseline.md`.
+9. Commit the audit baseline on the execution branch
+   (`claude/skills-trim-and-discipline`). The plan dir is tracked per
+   the gitignore exemption from the setup PR, so the audit file is
+   durable in git. Subsequent tasks read it from disk and reference it
+   by file path; the commit acts as the Phase 1 starting checkpoint.
 
 ## Acceptance criteria
 
@@ -74,5 +76,18 @@ becomes uncheckable.
 
 ## Commit / PR
 
-- No commit, no PR. Plan files are gitignored; the audit file on disk is
-  the checkpoint. Subsequent tasks read it directly.
+- Commit message:
+  ```
+  chore(plan): baseline measurements for skills-trim-and-discipline
+
+  Captures pre-Phase-1 wc -c measurements over CLAUDE.md, all 20
+  SKILL.md files, references, agents, mantras, and environment files.
+  Per-skill description char counts. Cross-reference graph. Always-loaded
+  baseline (CLAUDE.md + descriptions). Reference for all subsequent
+  phase audit gates.
+
+  Plan: skills-trim-and-discipline
+  Task: 00
+  ```
+- No PR (single-branch execution; commits aggregate into the umbrella PR
+  at Phase 9 / Task 38).
