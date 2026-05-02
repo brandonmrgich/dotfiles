@@ -205,4 +205,4 @@ Brandon runs a personal multi-host setup centered on a MacBook Pro M1 (primary d
 | `~/dotfiles` | GNU Stow dotfiles — shell, Claude, tmux, git, starship |
 | `~/.config/nvim` | Neovim config |
 
-For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.
+For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. For per-host filesystem layout and storage decisions (where caches and data dirs go, and why) see `~/.claude/environment/filesystems.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.
