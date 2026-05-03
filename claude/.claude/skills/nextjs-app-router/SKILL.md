@@ -1,6 +1,6 @@
 ---
 name: nextjs-app-router
-description: Next.js 13+ App Router specialist covering server components, client components ("use client"), server actions ("use server"), route handlers, middleware, streaming, suspense boundaries, parallel and intercepting routes, data fetching patterns, the four caching layers (Request Memoization, Data Cache, Full Route Cache, Router Cache), revalidation strategies (revalidatePath, revalidateTag, router.refresh), dynamic vs static rendering decisions, hydration patterns including persisted Zustand stores with skipHydration, theme-via-cookie SSR patterns, and the BFF (backend-for-frontend) proxy pattern for same-origin admin traffic. Trigger when the prompt or files in scope reference any of: Next.js, app router, server component, client component, "use client", "use server", server action, route handler, middleware, layout.tsx, page.tsx, loading.tsx, error.tsx, not-found.tsx, generateMetadata, generateStaticParams, revalidatePath, revalidateTag, unstable_cache, fetch cache, cookies, headers, redirect, notFound, useFormStatus, useFormState, useOptimistic, app/ directory routing, parallel routes, intercepting routes, route groups, dynamic segments, catch-all segments, app/api/ proxy routes, BFF proxy, skipHydration, persist.rehydrate, hydration mismatch, /app/, .tsx files in app/, next.config.js, next.config.mjs. Do NOT trigger for Pages Router (pages/ directory) — that is a different paradigm. Do NOT trigger for general React unrelated to Next.js framework features. DO trigger for core Next.js API questions (revalidatePath, revalidateTag, caching, server components, etc.) even when inside a monorepo — framework questions are always in scope. Do NOT trigger for questions about a specific monorepo's BFF proxy wiring or app-level architecture — defer those to project-local specialists like music-platform-api or music-platform-architecture.
+description: "Use when the prompt or files in scope reference Next.js 13+ App Router: server / client components, 'use client' / 'use server' directives, server actions, route handlers, middleware, app/ routing files (layout.tsx / page.tsx / loading.tsx / error.tsx / not-found.tsx), generateMetadata, generateStaticParams, Request/Data/Full Route/Router Cache layers, revalidatePath / revalidateTag / unstable_cache / router.refresh, cookies / headers / redirect / notFound, useFormStatus / useFormState / useOptimistic, parallel and intercepting routes, route groups, dynamic and catch-all segments, BFF proxy under app/api/, skipHydration / persist.rehydrate / hydration mismatch, next.config.{js,mjs}. Do NOT trigger for Pages Router (pages/) or for generic React unrelated to framework features. Do NOT trigger for a specific monorepo's BFF wiring — defer to project-local specialists (music-platform-api, music-platform-architecture). DO trigger for core framework API questions even inside a monorepo."
 ---
 
 # Next.js App Router Specialist
@@ -146,63 +146,23 @@ When using Zustand persist (or similar) with SSR, hydration mismatches
 happen because the server emits empty state while the client emits
 restored-from-localStorage state.
 
-The fix:
+The fix: `skipHydration: true` on the persist config prevents auto-hydration;
+manual `persist.rehydrate()` in a client `useEffect` ensures the first paint
+matches the server, then state restores after.
 
-```ts
-// store.ts
-export const useStore = create(
-  persist(
-    (set) => ({ /* ... */ }),
-    {
-      name: 'my-store',
-      skipHydration: true,  // critical
-    }
-  )
-)
-
-// providers.tsx
-"use client"
-export function Providers({ children }) {
-  useEffect(() => {
-    useStore.persist.rehydrate()
-  }, [])
-  return <>{children}</>
-}
-```
-
-`skipHydration: true` prevents auto-hydration; manual `persist.rehydrate()`
-in a `useEffect` ensures the first paint matches the server, then state
-restores after.
+**Full code:** `~/.claude/skills/nextjs-app-router/patterns/hydration.example.tsx`
+— persisted Zustand with skipHydration + manual rehydrate.
 
 ## Theme via cookie (SSR-correct)
 
 Avoid `next/script` theme bootstrap (triggers React 19 warnings). Use a
-cookie + `Sec-CH-Prefers-Color-Scheme` pattern:
+cookie + `Sec-CH-Prefers-Color-Scheme` pattern: a server component reads
+both in `app/layout.tsx` and emits the correct theme class on first paint.
+A client `ThemeProvider` then syncs cookie + localStorage on changes. No
+client-side script in the React tree.
 
-```tsx
-// app/layout.tsx
-import { cookies, headers } from "next/headers"
-
-export default async function RootLayout({ children }) {
-  const cookieStore = cookies()
-  const themeCookie = cookieStore.get("theme")?.value
-  const colorSchemeHeader = headers().get("sec-ch-prefers-color-scheme")
-  const theme = themeCookie ?? colorSchemeHeader ?? "light"
-
-  return (
-    <html className={theme === "dark" ? "dark" : ""}>
-      <body>
-        <ThemeProvider ssrInitialTheme={theme}>
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  )
-}
-```
-
-Theme provider syncs cookie + localStorage on changes. No client-side
-script in the React tree.
+**Full code:** `~/.claude/skills/nextjs-app-router/patterns/theme-cookie.example.ts`
+— SSR-correct theme via cookie + Sec-CH-Prefers-Color-Scheme.
 
 ## Common pitfalls
 

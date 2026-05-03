@@ -1,6 +1,6 @@
 ---
 name: astro-static-sites
-description: Astro framework specialist for static and mostly-static sites including marketing landing pages, documentation sites, and content-driven sites. Covers the Islands Architecture (selective hydration via client:* directives), content collections (type-safe markdown/MDX), Astro components (.astro files), integrations (React, Vue, Svelte, Tailwind, MDX, sitemap), the build pipeline (static vs hybrid vs server output), partial hydration directives (client:load, client:idle, client:visible, client:media, client:only), data fetching at build time vs request time, deployment targets (Vercel, Netlify, Cloudflare, static hosts), and View Transitions API integration. Trigger when the prompt or files in scope reference any of: Astro, .astro files, astro.config.mjs, astro.config.ts, content collections, defineCollection, getCollection, getEntry, client:load, client:idle, client:visible, client:media, client:only, Astro.props, Astro.glob, Astro.url, Astro.request, getStaticPaths, integrations directory, @astrojs/, MDX in Astro context, Astro middleware, View Transitions, ViewTransitions component. Do NOT trigger for generic markdown/MDX questions unrelated to Astro framework features. Do NOT trigger for static site questions when the framework is Next.js, Gatsby, or other.
+description: "Use when the prompt or files in scope reference Astro: .astro files, astro.config.{mjs,ts}, @astrojs/ integrations (React, Vue, Svelte, Tailwind, MDX, sitemap), content collections (defineCollection, getCollection, getEntry), Astro.props / Astro.glob / Astro.url / Astro.request, getStaticPaths, Astro middleware, the Islands Architecture and client:* hydration directives (client:load / client:idle / client:visible / client:media / client:only), static vs hybrid vs server output, build-time vs request-time data fetching, deployment to Vercel / Netlify / Cloudflare / static hosts, and View Transitions / ViewTransitions component. Suits marketing landing pages, documentation sites, and content-driven sites. Do NOT trigger for generic markdown / MDX questions unrelated to Astro framework features. Do NOT trigger for static-site questions when the framework is Next.js, Gatsby, or other."
 ---
 
 # Astro Static Sites Specialist
@@ -47,37 +47,12 @@ const data = await fetch('https://api.example.com/data').then(r => r.json())
 
 ## Content collections (the killer feature)
 
-Type-safe content with frontmatter validation:
+Type-safe content with Zod-validated frontmatter. `defineCollection` lives
+in `src/content/config.ts`; `getCollection` / `getEntry` queries are typed
+from the schema. Works for `.md`, `.mdx`, `.json`, `.yaml`, `.yml` — use
+for blogs, docs, project listings.
 
-```ts
-// src/content/config.ts
-import { defineCollection, z } from 'astro:content'
-
-const blog = defineCollection({
-  type: 'content',
-  schema: z.object({
-    title: z.string(),
-    publishDate: z.date(),
-    author: z.string(),
-    tags: z.array(z.string()),
-  }),
-})
-
-export const collections = { blog }
-```
-
-Then queries are typed:
-
-```ts
-import { getCollection, getEntry } from 'astro:content'
-
-const allPosts = await getCollection('blog')
-const post = await getEntry('blog', 'my-first-post')
-// post.data is fully typed from the schema
-```
-
-Content collections work for `.md`, `.mdx`, `.json`, `.yaml`, `.yml`. Use
-them for blogs, docs, project listings, anything content-shaped.
+Full example: `examples/content-collections.example.ts`.
 
 ## Build output modes
 
@@ -146,32 +121,11 @@ The `astro add` command edits config and installs deps in one step.
 
 ## View Transitions
 
-Built-in support for smooth page transitions:
+Built-in smooth page transitions: drop `<ViewTransitions />` in `<head>`,
+opt elements in via `transition:name=` or `transition:persist` (survives
+navigations — audio players, header nav).
 
-```astro
----
-import { ViewTransitions } from 'astro:transitions'
----
-
-<html>
-  <head>
-    <ViewTransitions />
-  </head>
-  <body>
-    <main transition:name="content">
-      <slot />
-    </main>
-  </body>
-</html>
-```
-
-Persistent elements (audio players, header nav) survive navigations:
-
-```astro
-<header transition:persist>
-  <!-- not re-rendered on nav -->
-</header>
-```
+Full example: `examples/view-transitions.example.astro`.
 
 ## Tooling exception watchlist
 

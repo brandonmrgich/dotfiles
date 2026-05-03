@@ -24,6 +24,20 @@ Before acting on any request:
 - Never scan the full project or docs directory unprompted.
 - "Inspect relevant context" means targeted reads — not exhaustive ones.
 
+## Tool selection
+
+Choose dedicated tools over Bash. Each Bash invocation costs the user a permission prompt — bulk read/move/list operations via Bash spam approvals.
+
+| Task | Use | Not |
+|---|---|---|
+| Read a file | `Read` | `cat`, `head`, `tail`, `less` |
+| Search file contents | `Grep` | `grep`, `rg` |
+| Find files by name | `Glob` | `find`, `ls` (when listing) |
+| Edit a file | `Edit` | `sed`, `awk`, redirected `echo` |
+| Write a new file | `Write` | `cat <<EOF`, `echo >` |
+
+Reserve Bash for: filesystem mutations (`mv`, `cp`, `mkdir`, `rm`), git operations, network calls, process management, running scripts. If a dedicated tool fits, the dedicated tool wins — even when Bash would be one line.
+
 ## Debugging behavior
 
 - Ground diagnosis in observable evidence: logs, error messages, reproduction steps.
@@ -47,88 +61,88 @@ For multi-step operations, emit lightweight progress:
 
 ---
 
+## Dotfiles workflow
+
+The `~/.claude/` tree is managed by GNU Stow from `~/dotfiles/claude/.claude/`. When adding, removing, or restructuring anything under `~/.claude/` or any other stow-managed path under `~/dotfiles/`:
+
+- **Never create symlinks manually with `ln -s` or `ln -sf`.** Stow owns the symlinks. Manual symlinks break stow's conflict detection and will surface as "not owned by stow" on the next `stow --simulate`.
+- Edit the source file at `~/dotfiles/<package>/<path>`, not the runtime symlink at `~/<path>`.
+- After adding or removing a tracked path: run `cd ~/dotfiles && stow <package>` (or `stow -R <package>` to restow). Verify with `ls -la ~/<path>` — should show a symlink.
+- This applies even when the primary working directory is a different repo. If you're touching anything under `~/.claude/` or `~/dotfiles/`, this rule fires.
+
+Full conventions in `~/dotfiles/CLAUDE.md`.
+
+---
+
 ## Sidecar conventions
 
 Every non-trivial source file should have a sibling `.claude` sidecar
-(`<file>.<ext>.claude`, e.g. `auth.go.claude`). The sidecar carries what the
-code cannot: design decisions, invariants, gotchas, cross-module contracts.
+carrying design decisions, invariants, and gotchas the code cannot.
+**Read before editing; update after changes that affect intent.**
+See `~/.claude/references/sidecar-conventions.md` for label/role
+taxonomy, when-to-create rules, and sidecar maxims.
 
-**Read the sidecar before editing any non-trivial file.**
-**Update the sidecar after any change that affects design intent or invariants.**
+---
 
-### Sidecar format
+## Essay convention
 
-```
-just_use <filename>.<ext>
+Long-form markdown files for working through ideas in prose — not tickets, not commit messages, not chat turns. Some thoughts need 400–800 words to settle.
 
-# label: LABEL
-# role: <one-line description>
+- Live alongside the project or in a dedicated `/essays/` directory.
+- Written by Claude, the human, or collaboratively.
+- **Lifecycle:** most essays are disposable — written to think, then discarded or distilled into memory. A few earn promotion to named docs. Disposability is a feature; quality is cheap to regenerate.
+- **Graduation:** moving an essay to a stable named doc is a deliberate act, not a drift.
 
-<free-form prose>
-```
+An insight from an essay often deserves distillation into a memory; a memory describing load-bearing behavior often deserves reflection in the relevant sidecar.
 
-> **Exception:** Match the existing `.claude` suffix convention if a repo already
-> uses `auth.claude` instead of `auth.go.claude`.
+---
 
-### Label taxonomy
+## Design doctrines (mantras)
 
-| Label         | Meaning                                                |
-| ------------- | ------------------------------------------------------ |
-| `CANONICAL`   | Single source of truth; edits ripple widely            |
-| `ELEGANT`     | Exemplary — match its style nearby                     |
-| `INTRICATE`   | Algorithmically dense; test rigorously before touching |
-| `WORKHORSE`   | Ugly but productive; don't polish, just modify         |
-| `CLEAN_INFRA` | Well-factored plumbing; don't bloat it                 |
-| `SCAFFOLD`    | Wires things together; easy to miss a connection       |
-| `ROUTER`      | Top-level dispatcher; low logic density                |
-| `SIMPLE`      | Short and obvious                                      |
-| `TINY`        | Fits entirely in your head                             |
-| `EARLY`       | Work-in-progress; shape not settled                    |
-| `SPRAWLING`   | Big and growing; be careful adding scope               |
-| `ONE_OFF`     | Genuinely unique; accept its idiosyncrasy              |
-| `GENERATED`   | Do NOT hand-edit; regenerate instead                   |
-| `TOOL`        | Stand-alone utility; edits ripple nowhere              |
+Load-bearing principles internalized as mantras — applied on every shape decision without retrieval. "Doctrine" and "mantra" are interchangeable; full text lives at `~/.claude/mantras/<title>.md`.
 
-### Role taxonomy
+### Make state honest
 
-| Role keyword               | Meaning                                         |
-| -------------------------- | ----------------------------------------------- |
-| `domain`                   | Core types, rules, invariants; no I/O           |
-| `encodes domain knowledge` | Alias for `domain`                              |
-| `supports feature`         | Handler, endpoint, or product feature           |
-| `agent tool`               | Script/CLI run by an agent or developer         |
-| `pure helpers`             | Stateless utilities; no side effects            |
-| `derived data`             | Computes from other sources; no canonical state |
-| `read-side`                | Read-only surface over a data layer             |
-| `one-shot`                 | Runs once; not part of normal flow              |
-| `historical`               | Preserved for context; do not modify            |
-| `legacy`                   | Functional but slated for replacement           |
+The data shape of the system should match what's actually true about reality at the point of use. Four failure modes:
 
-**Format:** `# role: <keyword>` or `# role: <keyword> — <what specifically>`
+- **Wider than reality** — type carries a `Maybe`/`NULL` the local site has already ruled out. Alarm: "shouldn't happen by construction."
+- **Narrower than reality** — wire throws away data the producer already had. Alarm: "B can re-derive this from A's output."
+- **Inventing reality** — naming a non-problem as a recovery scenario. Alarm: "stuck-state recovery."
+- **Fragmented** — two representations for one truth that drift and create bugs at the seam.
 
-### When to create a sidecar
+The fix is always the same: change the shape, not the comment or the adapter layer.
 
-**Required — do not skip:**
-- Creating a new non-trivial source file → create its sidecar in the same commit
-- Editing a non-trivial file → update the sidecar if design intent or invariants changed
-- Discovering buried decisions, gotchas, or cross-file invariants while working
+### Eliminate, don't paper over
 
-**Not required:**
-- Do NOT sidecar every file in a codebase unless explicitly asked
-- Trivial files (simple configs, generated files, tiny utilities) do not need sidecars
+When code feels contorted — adding adapters, translation helpers, step counters, defer-until-later branches, defensive comments — the discomfort is information about the shape, not noise to suppress. The remedy is structural.
 
-**Why sidecars matter:**
-Sidecars are stability signals and lightweight context anchors. They prevent codebase
-scouring by giving future sessions exactly the non-obvious information needed to touch
-a file safely — without re-reading the whole tree.
+**The license: I own the whole system.** Every contract, both sides. The diagnostic before any patch: does this invariant let me *delete* code? If yes, deleting is the work. Patching without deleting is a smell. When two components feel out of phase, reshape one or both until the translation falls away.
 
-### What belongs in a sidecar
+Trigger: any time you hear yourself writing "// shouldn't happen", adding a `step` counter, deferring a decision to a later layer, or reaching for a translation helper — stop. The shape is wrong.
 
-Good: why a decision was made, invariants the code assumes but doesn't enforce,
-known gotchas, cross-language contracts, what NOT to do here and why.
+---
 
-Not: anything obvious from reading the code, narration of what the code does,
-ephemeral TODOs.
+## Artifact classes
+
+Six artifact classes share the YAML front-matter mechanism but answer
+different questions: **memory**, **mantra**, **idea**, **essay**,
+**plan**, **doc**. The anchor chain is `idea → essay → plan → doc → code`,
+with mantras informing it. Each class has its own minimal schema —
+don't add fields it doesn't need.
+
+Full table, anchor-chain diagram, and field-purpose breakdown:
+`~/.claude/references/artifact-classes.md`.
+See also `~/.claude/essays/cross-claude-mantras-and-skills-integration.md`
+for rationale.
+
+---
+
+## Ideas
+
+Capture pre-plan ideas via the `idea-tracker` skill. Lives at `~/.claude/ideas/`,
+tracked in dotfiles. Activates on phrases like "save as idea", "track this", or
+"what ideas do I have". Replaces the legacy TODO system — TODOs were the prior
+mechanism for stashing things to build that didn't yet have concrete plans.
 
 ---
 
@@ -157,10 +171,12 @@ skill picker. Apply the correct prefix to every new skill created, without excep
 Two-layer system installed user-wide:
 
 **Skills (`~/.claude/skills/`):**
+
 - `plan-executor` — main orchestrator. Sequential, dispatch-and-collect.
 - `plan-auditor` — independent compliance auditor (separate skill, invoked on-demand)
 
 **Agents (`~/.claude/agents/`):**
+
 - `plan-executor-implementer` — agent for code implementation tasks
 - `plan-executor-tester` — agent for test-writing tasks
 - `plan-executor-documenter` — agent for documentation tasks
@@ -171,41 +187,26 @@ argument. Agents are registered at `~/.claude/agents/<name>.md` and the
 `name` in the file's frontmatter must match.
 
 **To run a plan:** invoke `plan-executor` with a master plan path and
-tasks directory. State is persisted to `.claude/plan-state.json` in the
-current project, so execution resumes across sessions.
+tasks directory. State is persisted to `.claude/plan-states/<plan-name>.json`
+in the current project, so execution resumes across sessions.
 
 **Failure behavior:** stop-and-ask on non-trivial failures.
 
 **Auditing:** plan-executor invokes plan-auditor only on demand mid-plan,
 automatically once at plan completion.
 
+See `~/.claude/references/plan-system.md` for canonical filesystem layout, gitignore rules, and multi-plan/worktree conventions.
+See `~/.claude/references/console-discipline.md` for output rules (when to write to file vs print to chat).
+
 ---
 
 ## Environment Map
 
-Brandon runs a personal multi-host setup centered on a MacBook Pro M1 (primary dev + music production). Always-on infrastructure: Debian MacBook 2012 (agent host, Tailscale-routed), Raspberry Pi 4 (DNS via Pi-hole + Unbound), AWS EC2 (MusicPlatform production backend), Oracle Cloud (legacy standby). Tailscale (`tail2c0e11.ts.net`) is the cross-device network layer for personal devices; AWS and Oracle are public-IP only. All hosts have `~/.ssh/config` entries — access is always `ssh <alias>`.
-
-### Hosts
-
-| Host | Tailscale / IP | SSH user | Purpose |
-|---|---|---|---|
-| MacBook Pro M1 (`Brandons-MacBook-Pro.local`) | `m1-macbook` | — | Primary dev, Logic Pro, music production |
-| Debian MacBook 2012 (`macbook-intel-2012-debian`) | `debian-macbook` | brandon | Always-on agent host; Gastown orchestration planned |
-| Raspberry Pi 4 (`DietPi`) | `pi` · `100.78.214.27` | dietpi | Pi-hole + Unbound DNS; MVP config, early stage |
-| Oracle Cloud (`instance-20230401-new`) | none · `129.213.56.229` | opc | Legacy standby, no active services |
-| AWS EC2 (`ip-172-31-91-143`) | none · Elastic IP | ubuntu | MusicPlatform production (Docker + Nginx) |
-
-### Major repos
-
-| Path | Purpose |
-|---|---|
-| `~/Development/GitHubProjects/MusicPortfolio` | Full-stack music platform — Fastify API, Next.js, Postgres, Cloudflare CDN |
-| `~/Development/Freelance/Dubsync` | Freelance client work (fullstack) |
-| `~/Development/GitHubProjects/ContentAutomatorWeb/content-automator-web` | Multi-platform content posting, web (Vite/TS/Tailwind — active) |
-| `~/dotfiles` | GNU Stow dotfiles — shell, Claude, tmux, git, starship |
-| `~/.config/nvim` | Neovim config |
-
-For host details see `~/.claude/environment/hosts.md`. For network and DNS see `~/.claude/environment/networks.md`. For services see `~/.claude/environment/services.md`. For repo details see `~/.claude/environment/repos.md`. For per-host filesystem layout and storage decisions (where caches and data dirs go, and why) see `~/.claude/environment/filesystems.md`. The `environment-map` skill activates these on demand for cross-host or cross-repo queries.
+Brandon runs a multi-host personal setup (M1 MacBook + Debian agent
+host + Pi DNS + AWS prod + Oracle standby). The `environment-map`
+skill loads the full topology on demand. Activate it on host names,
+service names, or cross-machine queries. See
+`~/.claude/environment/` for the source files.
 
 ---
 

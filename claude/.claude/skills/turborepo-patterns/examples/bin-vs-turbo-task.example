@@ -1,0 +1,29 @@
+// Example: a package that exposes BOTH a bin executable and a Turbo task.
+// They live at different layers and serve different callers — bin is for
+// downstream consumers, the Turbo task is for orchestrated monorepo runs.
+//
+// Pitfall: `pnpm --filter @my-org/db db:generate` runs the npm script
+// directly and bypasses turbo.json — no caching. Use
+// `turbo run db:generate --filter=@my-org/db` to get Turbo caching.
+//
+// Referenced from: ~/.claude/skills/turborepo-patterns/SKILL.md
+
+// packages/db/package.json
+{
+  "bin": {
+    "db-generate": "./bin/generate.js"
+  },
+  "scripts": {
+    "db:generate": "prisma generate"
+  }
+}
+
+// packages/db/turbo.json
+{
+  "extends": ["//"],
+  "pipeline": {
+    "db:generate": {
+      "outputs": ["src/generated/**"]
+    }
+  }
+}

@@ -57,6 +57,8 @@ stow -R <package>
 ## Invariants
 
 - Never edit files directly in `~` — edit the source in `~/dotfiles/<package>/` and the symlink propagates.
+- **Never create manual symlinks in `~`.** All symlinks must be created and owned by stow. A manually created symlink breaks stow's conflict detection and will be flagged as "not owned by stow" on the next `stow --simulate`. If you find one, remove it and re-run stow.
+- `starship.toml` lives at `starship/.config/starship.toml` — stow targets `~/.config/starship.toml`.
 - `starship.toml` format string drives the Claude Code statusline (`claude/.claude/statusline-command.sh`) — keep them in sync when changing prompt segments.
 - `~/.zshrc.local` is intentionally untracked — use it for machine-local overrides.
 
@@ -86,3 +88,23 @@ Run `stow -d ~/dotfiles -t ~ claude` after ANY of these actions:
 **Do not** create files directly in `~/.claude/` — always create in `~/dotfiles/claude/.claude/` first, then stow.
 
 Verify before committing: `ls -la ~/.claude/<new-path>` should show a symlink, not a real file.
+
+## Tagging and releases
+
+This is an **auto-tag-on-main** repo: every meaningful change to `main` gets a tag and a GitHub release. Tag scheme is sequential two-component semver (`vMAJOR.MINOR`, no patch component). Run `git tag --list --sort=-v:refname | head` for the current cadence.
+
+The canonical policy lives at `~/.claude/skills/github/SKILL.md` §4 ("Auto-tag-on-main repos"). **Invoke the `github` skill before pushing to `main`** — it encodes the per-repo tagging conventions and prevents the "pushed without tagging" miss.
+
+After landing a change on `main`:
+
+```bash
+git tag -a vX.Y -m "summary of the change"
+git push origin vX.Y
+gh release create vX.Y --title "vX.Y — summary" --notes "<release notes>"
+```
+
+Bump MINOR for new features, conventions, or substantive doc additions. Bump MAJOR (and reset MINOR to 0) for breaking changes or large restructures.
+
+Trivial config tweaks may skip the PR but never skip the tag — the tag is the "released to my machines" signal, distinct from the commit. If a change feels too small to tag, it's worth bundling with the next change rather than landing it untagged.
+
+> **Provisional.** The two-component scheme collapses "patch" and "minor" severity onto the same axis. Redesign tracked at `~/.claude/ideas/dotfiles-versioning-redesign.md`.

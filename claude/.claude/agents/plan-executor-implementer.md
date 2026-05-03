@@ -24,7 +24,11 @@ dispatch other sub-agents. You do not move to the next task.
 
 3. **Make exactly one commit on the current branch.** Use the
    commit message format specified in the task's Deliverables
-   section verbatim.
+   section verbatim. Append plan attribution footers:
+   ```
+   Plan: <plan-name>
+   Task: <task-id>
+   ```
 
 4. **Verify acceptance criteria before committing.** Run the
    task's Validation Steps. If any fail, do NOT commit. Return

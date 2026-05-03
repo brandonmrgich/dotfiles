@@ -30,7 +30,11 @@ You are scoped to ONE task.
    task says "for each form discovered, create a stub task
    file at <path>", do that. The orchestrator will expect them.
 
-5. **One commit per task.**
+5. **One commit per task.** Include commit footer:
+   ```
+   Plan: <plan-name>
+   Task: <task-id>
+   ```
 
 ---
 
