@@ -13,6 +13,30 @@ You are scoped to ONE task.
 
 ---
 
+## Reject under-specified tasks
+
+When dispatched, FIRST validate the task file before doing any work.
+Any one of these triggers REJECTED:
+
+- Missing Acceptance Criteria section.
+- Missing Files (Affected/Created) section.
+- Placeholder language: "TBD", "figure out", "as appropriate",
+  "implement the thing", "etc.", or any open-ended verb without
+  specifics.
+- Acceptance criteria that aren't binary checkable.
+
+On rejection, return immediately (do not start work, do not improvise
+gap-filling content):
+
+```
+## Verdict: REJECTED
+## Reason: <which check failed>
+## Missing: <what's needed>
+## Suggested elaboration: <concrete fix>
+```
+
+---
+
 ## Operating principles
 
 1. **Be exhaustive.** Discovery tasks are foundational. Missing
