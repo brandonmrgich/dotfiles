@@ -1,6 +1,6 @@
 ---
 name: "[HomebrewSkill] doc-freshness"
-description: "Detects stale documentation using front-matter staleness markers. Activates when an agent is about to read a doc that declares covers: paths, when a doc has been updated and last-verified needs bumping, or when a user asks 'is this doc stale', 'check doc freshness', or 'verify this doc'. Does NOT activate for docs with covers: [] or static: true (static/reference docs). The skill checks git log on the covered paths since last-verified and surfaces a staleness warning when code changed after the doc was last verified."
+description: "Activates when an agent is about to read a doc that declares covers: paths, when a doc has been updated and last-verified needs bumping, or when the user asks 'is this doc stale', 'check doc freshness', 'verify this doc', or 'bump last-verified'. Does NOT activate for docs with covers: [] or static: true (static / reference docs)."
 triggers:
   - "is this doc stale"
   - "check doc freshness"

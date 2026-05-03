@@ -1,6 +1,6 @@
 ---
 name: skill-author
-description: Meta-skill for creating new Claude Code skills and agents. Activates when the user explicitly asks to create, capture, or save a skill, agent, sub-agent, or workflow. Triggers include phrases like "create a skill for this", "save this as a skill", "make this an agent", "turn this into a skill", "capture this pattern", "add a skill", "write a skill for X". Also activates when the user is in a session that involved extensive research, web searches, repeated context-gathering on a niche topic, or substantial domain-specific work that produced a distinct repeatable pattern — once activated, the skill prompts the user proactively to ask whether to capture the work. Knows the difference between skills (description-triggered context) and agents (registered sub-agent types invoked via Task tool), and the difference between user-wide (~/.claude/) and project-local (.claude/) installation. Do NOT trigger for trivial requests, single-question Q&A, or any prompt where the user is clearly asking for an immediate task to be completed (only trigger when the user is explicitly authoring/capturing a skill or when the meta-pattern of "this work could become a skill" applies).
+description: Use when the user explicitly asks to create, capture, or save a skill, agent, sub-agent, or workflow. Triggers include "create a skill for this", "save this as a skill", "make this an agent", "turn this into a skill", "capture this pattern", "add a skill", "write a skill for X". Also activates implicitly when the session shows multi-doc research, niche concept exploration, repeated context-gathering, or substantial domain-specific work that produced a distinct repeatable pattern. Do NOT trigger for trivial requests, single-question Q&A, or any prompt where the user is clearly asking for an immediate task to be completed (only when the user is explicitly authoring/capturing a skill or when the meta-pattern of "this work could become a skill" applies).
 ---
 
 # Skill / Agent Authoring Specialist
@@ -81,6 +81,25 @@ and description-format CSO rules, agent-specific questions):
 
 **Worked examples** (good vs bad captures, when agent beats skill):
 same reference, §Examples.
+
+**Description format.** SKILL.md `description:` field rules
+(≤1024 chars, third person, "Use when…" prefix, triggers-only,
+keyword pool preserved):
+`~/.claude/references/description-format.md`.
+
+## Pressure-test before merge
+
+New **discipline-pressure** skills (those that enforce a procedure
+under conditions where the model is tempted to shortcut) must pass a
+RED → GREEN → REFACTOR cycle before landing.
+
+- **Methodology + fixture format:**
+  `~/.claude/references/skill-pressure-testing.md`.
+- **Runner:** dispatch the `skill-pressure-tester` agent with a
+  fixture path; it returns a verdict + rationalization deltas.
+
+Specialist (domain-knowledge) skills are exempt. Ritual skills run
+the cycle when they encode pressure language.
 
 ## What you must never do
 

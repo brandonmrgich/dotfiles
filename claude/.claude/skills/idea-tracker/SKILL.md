@@ -1,6 +1,6 @@
 ---
 name: "[HomebrewSkill] idea-tracker"
-description: "Capture and manage ideas — pre-plan stash for things to build that don't yet have concrete scope. Triggers when user says \"save as idea\", \"track this idea\", \"let's remember this for later\", \"we should eventually X\", or asks \"what ideas do I have\". Activates when conversation surfaces a future direction worth preserving but not actioning now. Replaces the legacy TODO system."
+description: "Use when the user says \"save as idea\", \"track this idea\", \"remember this for later\", \"park this for now\", \"we should eventually X\", \"shelve this idea\", \"promote this idea\", or asks \"what ideas do I have\" / \"list my ideas\". Also activates when conversation surfaces a future direction worth preserving but not actioning now."
 triggers:
   - "save as idea"
   - "track this idea"

@@ -1,6 +1,6 @@
 ---
 name: "[HomebrewSkill] session-ready"
-description: "Probe whether a fresh Claude with no conversation history could pick up the current work cleanly. Dispatches a sub-agent with cold context, points it at the target (current task, plan, essay, or working state), and reports what's clear vs what's missing. If gaps are found, surfaces specific remediation (top-down-sweep, essay update, sidecar refresh). Use before closing a session at end of day, before handing work to a different session, or whenever you suspect the docs no longer carry enough context. Activates on '/session-ready', 'is this session ready', 'fresh claude check', 'before closing', 'can a new session pick this up'."
+description: "Activates on '/session-ready', 'is this session ready', 'fresh claude check', 'before closing', 'can a new session pick this up', or when the user is about to close a session at end of day, hand work to a different session, or suspects the docs no longer carry enough context. Target may be a current task, plan, essay, or working state."
 triggers:
   - /session-ready
   - "session ready"

@@ -1,17 +1,15 @@
 ---
 name: "[HomebrewSkill] environment-map"
 description: >
-  User's broader environment map — hosts, networks, services, and major repos
-  beyond the current working directory. Activate when prompts mention: specific
-  hosts (m1-macbook, debian-macbook, macbook-intel-2012-debian, DietPi, pi,
-  instance-20230401-new, ip-172-31-91-143, oracle, aws); specific services
-  (pihole, pi-hole, unbound, Gastown, Nginx, Fastify); networking concepts
-  (Tailscale, tail2c0e11.ts.net, MagicDNS, tailnet, pihole DNS, 100.78.214.27);
-  repos by name (DubSync, ContentAutomator, ContentAutomatorWeb, MusicPortfolio,
-  MusicPlatform); or when asked "where does X live", "how do I reach Y",
-  "what runs on Z", or about cross-machine workflows. Do NOT activate for
-  routine work scoped entirely to one repo — project-local CLAUDE.md handles
-  that.
+  Use when prompts mention specific hosts (m1-macbook, debian-macbook,
+  macbook-intel-2012-debian, DietPi, pi, instance-20230401-new,
+  ip-172-31-91-143, oracle, aws); specific services (pihole, pi-hole,
+  unbound, Gastown, Nginx, Fastify); networking concepts (Tailscale,
+  tail2c0e11.ts.net, MagicDNS, tailnet, pihole DNS, 100.78.214.27); repos by
+  name (DubSync, ContentAutomator, ContentAutomatorWeb, MusicPortfolio,
+  MusicPlatform); or ask "where does X live", "how do I reach Y", "what runs
+  on Z", or about cross-machine workflows. Do NOT activate for routine work
+  scoped entirely to one repo — project-local CLAUDE.md handles that.
 ---
 
 # Environment Map

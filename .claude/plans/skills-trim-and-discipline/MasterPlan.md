@@ -348,6 +348,29 @@ At plan completion (Task 38):
    was forced).
 4. Update `anchors.produced` on both essays to point at this plan.
 
+## Phase-8 follow-ups (carry-forward)
+
+Tracked across audits. **Phase 8 / Task 37 (final audit) MUST surface
+each item; Task 38 (umbrella PR) MUST list any unresolved items in the
+PR body so they don't get lost.**
+
+| # | Source | Item | Priority |
+|---|---|---|---|
+| 1 | Task 13 audit | Prose-pruning for `nextjs-app-router` body (~+2,041 B over [≤6,500 B] specialist body budget) | high |
+| 2 | Task 13 audit | Prose-pruning for `turborepo-patterns` body (~+1,024 B) | high |
+| 3 | Task 13 audit | Prose-pruning for `royalty-splits-music` body (~+1,104 B) | high |
+| 4 | Task 18 audit | Prose-pruning for `ddex-standards` body (~+3,062 B; not in Phase-2 trim list) | high |
+| 5 | Task 13 audit | Prose-pruning for `plan-executor` body (~+502 B over [≤8,500 B] workflow budget) | medium |
+| 6 | Tasks 04/13/18/25 audits | Cold-session smoke test (deferred 4 times); single user-run check covers all gates | medium |
+| 7 | **Tasks 25 + 30 audits (Phases 5+6)** | **Re-run RED dispatches for all 8 discipline + ritual skills** with real orchestrator-scope sub-agent dispatch: 4 discipline (`systematic-debugging`, `verification-before-completion`, `test-driven-development`, `design-before-code`) + 4 ritual (`using-homebrew-skills`, `receiving-code-review`, `requesting-code-review`, `finishing-a-branch`). Current rationalizations are hypothetical-labeled (representative but not empirical). Iterate skill bodies if new rationalizations surface. **User-confirmed Phase-8 work after both Phase 5 and Phase 6, not blocking forward progression.** | high |
+| 8 | Task 18 audit | YAML quoting sweep across project-local skill dirs (any unquoted descriptions with colons should be fixed) | low |
+
+These are non-blocking for plan progression. Items 1–5 + 7 should land
+as discrete Phase-8 sub-tasks. Item 6 is a manual user check. Item 8 is
+a one-time grep.
+
+---
+
 ## Failure handling
 
 Per `~/.claude/skills/plan-executor/SKILL.md`'s stop-and-ask policy:
