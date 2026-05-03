@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 # ~/.claude/statusline-command.sh
-# Mirrors: $directory$git_branch$git_status$git_state
+# Mirrors: $hostname$directory$git_branch$git_status$git_state
+#
+# STATUS: DISABLED in settings.json — do not re-enable until the CPU spike is fixed.
+# Symptom: when wired up as Claude Code's statusline, this script periodically pegs
+# a core hard enough to kill the parent claude process. Suspected culprits, in order:
+#   1. The git status/ahead-behind block (lines ~52-90) runs porcelain + rev-list on
+#      every tick; on large/dirty repos this dominates wall time. The 10s mtime cache
+#      helps but the cold path is still expensive.
+#   2. `hostname -s` and the jq+eval bootstrap fire unconditionally each tick.
+#   3. No timeout/`nice` wrapping — a slow git call stalls the whole render.
+# Fix sketch: replace the porcelain pipeline with a single `git status --porcelain=v2
+# --branch` parse, wrap git calls in `timeout 0.5s`, lengthen cache TTL, and consider
+# moving the heavy work to a long-lived sidecar that the statusline just reads.
 
 BOLD_CYAN="\033[1;36m"
 BOLD_PURPLE="\033[1;35m"
@@ -143,7 +155,11 @@ if [ -n "$five_pct" ] && [ "$five_pct" != "null" ] || { [ -n "$week_pct" ] && [ 
   [ -n "$plan_parts" ] && plan_str=" $plan_parts"
 fi
 
+# --- Hostname (mirrors starship [hostname]: bold green, short host) ---
+host_display=$(hostname -s 2>/dev/null || hostname 2>/dev/null)
+
 # --- Assemble ---
+[ -n "$host_display" ] && printf "${BOLD_GREEN}[%s]${RESET} " "$host_display"
 printf "${BOLD_CYAN}%s${RESET}" "$dir_display"
 [ -n "$git_branch" ]     && printf "${BOLD_PURPLE}%s${RESET}" "$git_branch"
 [ -n "$git_status_str" ] && printf "${BOLD_YELLOW}%s${RESET}" "$git_status_str"
