@@ -141,51 +141,60 @@ before the next phase starts.
 
 ## Branching, PRs, and tagging
 
-**Cadence: single-branch execution + one umbrella PR.** Updated per user
-direction post-setup-merge: "complete all this work on one branch."
+**Cadence: per-phase PR into `main` on one persistent execution branch.**
+Refined after Phase 1: the user merged Phase 1 via PR #11, establishing
+that phases ship into `main` at audit-PASS boundaries. The same execution
+branch is fast-forwarded from `main` between phases and continues to carry
+subsequent phase work.
 
-- **Execution branch:** `claude/skills-trim-and-discipline` off the
-  post-setup `main` (current top tag at start: v2.4). All phase work
-  commits to this single branch in order. No per-phase branches; no
-  per-phase PRs.
-- **Within the branch:** Each task gets its own commit (preserving
-  surgical reverts and a clean per-task history). Audit-gate tasks
-  also commit their audit report under `audits/`.
-- **Phase MINOR tags placed on the branch at phase completion.** After
-  the last task of a phase commits and the audit gate (if any) passes,
-  tag the latest phase commit with the next MINOR (v2.5 for Phase 1,
-  v2.6 for Phase 2, …). Push tags to origin as they are placed; the
-  remote has the full progression history regardless of when the
-  branch merges.
+- **Execution branch:** `claude/skills-trim-and-discipline`. Reused
+  across all phases. After each phase PR merges, the branch is
+  fast-forwarded from `origin/main` and the next phase's commits land
+  on it.
+- **Within the branch:** Each task gets its own commit (per-task
+  surgical reverts, clean history). Audit-gate tasks also commit their
+  audit report under `audits/`.
+- **Phase MINOR tags on the audit-gate commit.** When a phase's audit
+  passes, tag the audit-gate commit (the last commit of the phase)
+  with the next MINOR (v2.5 placed on Phase 1's audit commit; v2.6
+  for Phase 2; …). Push tag to origin.
+- **Phase PR cadence.** After the audit PASS and tag are in place,
+  open a PR from `claude/skills-trim-and-discipline → main`. The user
+  merges. Branch is then ff-synced with `origin/main` for the next
+  phase. **8 phase PRs total** (Phases 1–8).
 - **No GitHub releases mid-plan.** Phase MINORs are tags only. Release
   is created at v3.0 from the cumulative work.
-- **Final umbrella PR (Phase 9 / Task 38):** The closeout commit
-  (essay resolutions + Measured outcome appended to essay #9) is
-  the last commit on the branch. Open the umbrella PR
-  `claude/skills-trim-and-discipline → main` at this point. Body
-  lists every phase by number with a one-line description plus the
-  measured outcome and links to the two source essays.
-  **The user merges this PR manually.**
-- **MAJOR tag at closeout:** Place v3.0 on the closeout commit (the
-  last commit on the branch, before merge). After the user merges the
-  umbrella PR, the user creates the GitHub release against v3.0. The
-  agent does NOT create the release.
+- **Final closeout PR (Phase 9 / Task 38):** The closeout commit
+  (essay resolutions + Measured outcome appended to essay #9) opens
+  the final PR. Body lists every phase MINOR tag with a one-line
+  description plus the measured outcome and links to the two source
+  essays. **The user merges this PR manually.**
+- **MAJOR tag at closeout:** Place v3.0 on the closeout commit before
+  the closeout-PR merge (or immediately after; tags reference commits,
+  not branches). After the user merges, the user creates the GitHub
+  release against v3.0. The agent does NOT create the release.
+
+> **Decision history.** The original plan called for a single
+> branch + one umbrella PR. That collapsed to per-phase merges
+> after Phase 1 because `main` advancing at audit boundaries makes
+> each phase a discrete reviewable unit and matches the auto-tag-on-main
+> convention's intent: each landed change earns a tag.
 
 ### Tag-bump summary
 
-| Stage | Tag |
-|---|---|
-| Setup PR merged (already landed) | v2.4 (already placed) |
-| Phase 1 audit PASS → tag latest phase 1 commit | v2.5 |
-| Phase 2 audit PASS → tag latest phase 2 commit | v2.6 |
-| Phase 3 audit PASS | v2.7 |
-| Phase 4 audit PASS | v2.8 |
-| Phase 5 audit PASS | v2.9 |
-| Phase 6 audit PASS | v2.10 |
-| Phase 7 complete (no gate; audit folds into Phase 8) | v2.11 |
-| Phase 8 audit PASS | v2.12 |
-| Phase 9 closeout commit | **v3.0** (before umbrella merge) |
-| **Total** | **8 MINOR + 1 MAJOR** placed during execution |
+| Stage | Tag | PR |
+|---|---|---|
+| Setup PR merged | v2.4 (placed) | #10 (merged) |
+| Phase 1 audit PASS | v2.5 (placed) | #11 (merged) |
+| Phase 2 audit PASS | v2.6 | per-phase PR |
+| Phase 3 audit PASS | v2.7 | per-phase PR |
+| Phase 4 audit PASS | v2.8 | per-phase PR |
+| Phase 5 audit PASS | v2.9 | per-phase PR |
+| Phase 6 audit PASS | v2.10 | per-phase PR |
+| Phase 7 complete (no gate; audit folds into Phase 8) | v2.11 | per-phase PR |
+| Phase 8 audit PASS | v2.12 | per-phase PR |
+| Phase 9 closeout commit | **v3.0** (before merge) | closeout PR |
+| **Total** | **8 MINOR + 1 MAJOR** placed during execution | **8 phase PRs + 1 closeout** |
 
 ### Audit gates
 

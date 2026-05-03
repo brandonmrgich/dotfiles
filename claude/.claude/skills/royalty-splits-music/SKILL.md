@@ -31,18 +31,9 @@ types):
 - Scope is XOR: a split row attaches to EITHER a recording OR a release,
   never both
 
-```typescript
-type RightsType = 'MASTER' | 'PUBLISHING'
-
-type RoyaltySplit = {
-  personId: string         // payee
-  rightsType: RightsType   // bucket
-  percentage: number       // 0-100
-  recordingId?: string     // XOR
-  releaseId?: string       // XOR
-  territory?: string       // ISO 3166 or 'WORLD'
-}
-```
+See `examples/types.example.ts` for the `RoyaltySplit` / `RightsType`
+shape (MASTER/PUBLISHING buckets, XOR `recordingId`/`releaseId`, optional
+ISO-3166 `territory`).
 
 Validation invariants:
 

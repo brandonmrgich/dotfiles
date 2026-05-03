@@ -1,0 +1,23 @@
+---
+// Astro View Transitions — built-in smooth page transitions.
+// See ../SKILL.md §"View Transitions".
+//
+// Drop <ViewTransitions /> in <head>; opt elements in via transition:name=
+// or transition:persist (survives navigations, e.g. audio players, header nav).
+import { ViewTransitions } from 'astro:transitions'
+---
+
+<html>
+  <head>
+    <ViewTransitions />
+  </head>
+  <body>
+    <header transition:persist>
+      <!-- not re-rendered on nav -->
+    </header>
+
+    <main transition:name="content">
+      <slot />
+    </main>
+  </body>
+</html>

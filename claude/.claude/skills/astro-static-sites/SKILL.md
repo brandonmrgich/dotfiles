@@ -47,37 +47,12 @@ const data = await fetch('https://api.example.com/data').then(r => r.json())
 
 ## Content collections (the killer feature)
 
-Type-safe content with frontmatter validation:
+Type-safe content with Zod-validated frontmatter. `defineCollection` lives
+in `src/content/config.ts`; `getCollection` / `getEntry` queries are typed
+from the schema. Works for `.md`, `.mdx`, `.json`, `.yaml`, `.yml` — use
+for blogs, docs, project listings.
 
-```ts
-// src/content/config.ts
-import { defineCollection, z } from 'astro:content'
-
-const blog = defineCollection({
-  type: 'content',
-  schema: z.object({
-    title: z.string(),
-    publishDate: z.date(),
-    author: z.string(),
-    tags: z.array(z.string()),
-  }),
-})
-
-export const collections = { blog }
-```
-
-Then queries are typed:
-
-```ts
-import { getCollection, getEntry } from 'astro:content'
-
-const allPosts = await getCollection('blog')
-const post = await getEntry('blog', 'my-first-post')
-// post.data is fully typed from the schema
-```
-
-Content collections work for `.md`, `.mdx`, `.json`, `.yaml`, `.yml`. Use
-them for blogs, docs, project listings, anything content-shaped.
+Full example: `examples/content-collections.example.ts`.
 
 ## Build output modes
 
@@ -146,32 +121,11 @@ The `astro add` command edits config and installs deps in one step.
 
 ## View Transitions
 
-Built-in support for smooth page transitions:
+Built-in smooth page transitions: drop `<ViewTransitions />` in `<head>`,
+opt elements in via `transition:name=` or `transition:persist` (survives
+navigations — audio players, header nav).
 
-```astro
----
-import { ViewTransitions } from 'astro:transitions'
----
-
-<html>
-  <head>
-    <ViewTransitions />
-  </head>
-  <body>
-    <main transition:name="content">
-      <slot />
-    </main>
-  </body>
-</html>
-```
-
-Persistent elements (audio players, header nav) survive navigations:
-
-```astro
-<header transition:persist>
-  <!-- not re-rendered on nav -->
-</header>
-```
+Full example: `examples/view-transitions.example.astro`.
 
 ## Tooling exception watchlist
 
