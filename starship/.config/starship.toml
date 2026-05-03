@@ -2,7 +2,11 @@
 # Docs: https://starship.rs/config/
 
 format = """
-$directory$git_branch$git_status$git_state $character"""
+$hostname$directory$git_branch$git_status$git_state $character"""
+
+[hostname]
+format = "[$symbol$hostname]($style) "
+style = "bold green"
 
 [directory]
 truncation_length = 3
