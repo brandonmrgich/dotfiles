@@ -82,6 +82,11 @@ and description-format CSO rules, agent-specific questions):
 **Worked examples** (good vs bad captures, when agent beats skill):
 same reference, §Examples.
 
+**Description format.** SKILL.md `description:` field rules
+(≤1024 chars, third person, "Use when…" prefix, triggers-only,
+keyword pool preserved):
+`~/.claude/references/description-format.md`.
+
 ## What you must never do
 
 - Do not write skill or agent files without explicit user confirmation
