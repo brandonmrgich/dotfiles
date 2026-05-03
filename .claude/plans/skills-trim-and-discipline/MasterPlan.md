@@ -362,7 +362,7 @@ PR body so they don't get lost.**
 | 4 | Task 18 audit | Prose-pruning for `ddex-standards` body (~+3,062 B; not in Phase-2 trim list) | high |
 | 5 | Task 13 audit | Prose-pruning for `plan-executor` body (~+502 B over [≤8,500 B] workflow budget) | medium |
 | 6 | Tasks 04/13/18/25 audits | Cold-session smoke test (deferred 4 times); single user-run check covers all gates | medium |
-| 7 | **Task 25 audit (Phase 5)** | **Re-run RED dispatches for all 4 discipline skills** (`systematic-debugging`, `verification-before-completion`, `test-driven-development`, `design-before-code`) **with real orchestrator-scope sub-agent dispatch.** Current rationalizations are hypothetical-labeled (representative but not empirical). Iterate skill bodies if new rationalizations surface. **User-confirmed Phase-8 work, not blocking Phase 6.** | high |
+| 7 | **Tasks 25 + 30 audits (Phases 5+6)** | **Re-run RED dispatches for all 8 discipline + ritual skills** with real orchestrator-scope sub-agent dispatch: 4 discipline (`systematic-debugging`, `verification-before-completion`, `test-driven-development`, `design-before-code`) + 4 ritual (`using-homebrew-skills`, `receiving-code-review`, `requesting-code-review`, `finishing-a-branch`). Current rationalizations are hypothetical-labeled (representative but not empirical). Iterate skill bodies if new rationalizations surface. **User-confirmed Phase-8 work after both Phase 5 and Phase 6, not blocking forward progression.** | high |
 | 8 | Task 18 audit | YAML quoting sweep across project-local skill dirs (any unquoted descriptions with colons should be fixed) | low |
 
 These are non-blocking for plan progression. Items 1–5 + 7 should land
