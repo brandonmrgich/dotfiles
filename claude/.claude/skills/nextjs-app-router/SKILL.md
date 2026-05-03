@@ -146,63 +146,23 @@ When using Zustand persist (or similar) with SSR, hydration mismatches
 happen because the server emits empty state while the client emits
 restored-from-localStorage state.
 
-The fix:
+The fix: `skipHydration: true` on the persist config prevents auto-hydration;
+manual `persist.rehydrate()` in a client `useEffect` ensures the first paint
+matches the server, then state restores after.
 
-```ts
-// store.ts
-export const useStore = create(
-  persist(
-    (set) => ({ /* ... */ }),
-    {
-      name: 'my-store',
-      skipHydration: true,  // critical
-    }
-  )
-)
-
-// providers.tsx
-"use client"
-export function Providers({ children }) {
-  useEffect(() => {
-    useStore.persist.rehydrate()
-  }, [])
-  return <>{children}</>
-}
-```
-
-`skipHydration: true` prevents auto-hydration; manual `persist.rehydrate()`
-in a `useEffect` ensures the first paint matches the server, then state
-restores after.
+**Full code:** `~/.claude/skills/nextjs-app-router/patterns/hydration.example.tsx`
+— persisted Zustand with skipHydration + manual rehydrate.
 
 ## Theme via cookie (SSR-correct)
 
 Avoid `next/script` theme bootstrap (triggers React 19 warnings). Use a
-cookie + `Sec-CH-Prefers-Color-Scheme` pattern:
+cookie + `Sec-CH-Prefers-Color-Scheme` pattern: a server component reads
+both in `app/layout.tsx` and emits the correct theme class on first paint.
+A client `ThemeProvider` then syncs cookie + localStorage on changes. No
+client-side script in the React tree.
 
-```tsx
-// app/layout.tsx
-import { cookies, headers } from "next/headers"
-
-export default async function RootLayout({ children }) {
-  const cookieStore = cookies()
-  const themeCookie = cookieStore.get("theme")?.value
-  const colorSchemeHeader = headers().get("sec-ch-prefers-color-scheme")
-  const theme = themeCookie ?? colorSchemeHeader ?? "light"
-
-  return (
-    <html className={theme === "dark" ? "dark" : ""}>
-      <body>
-        <ThemeProvider ssrInitialTheme={theme}>
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  )
-}
-```
-
-Theme provider syncs cookie + localStorage on changes. No client-side
-script in the React tree.
+**Full code:** `~/.claude/skills/nextjs-app-router/patterns/theme-cookie.example.ts`
+— SSR-correct theme via cookie + Sec-CH-Prefers-Color-Scheme.
 
 ## Common pitfalls
 
