@@ -26,35 +26,9 @@ defeat the purpose.
 
 ## turbo.json structure
 
-```json
-{
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local", "tsconfig.json"],
-  "globalEnv": ["NODE_ENV"],
-  "pipeline": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["NEXT_PUBLIC_API_BASE_URL"]
-    },
-    "lint": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "typecheck": {
-      "dependsOn": ["^build"]
-    },
-    "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    }
-  }
-}
-```
+**Full example:** `~/.claude/skills/turborepo-patterns/examples/turbo.json.example`
+— root pipeline covering build, lint, typecheck, test, and dev with the
+common dependsOn/outputs/env patterns.
 
 Field meanings:
 
@@ -143,18 +117,9 @@ if nothing in that app changed. Solution: `vercel.json` per app with
 The script runs `git diff` and exits 0 (skip build) if nothing in the
 app's directory or its workspace deps changed.
 
-Robust diff strategy:
-
-```js
-// pseudo-code
-const previousSha = process.env.VERCEL_GIT_PREVIOUS_SHA  // last successful deploy
-const baseSha = previousSha || await gitMergeBase('origin/main') || 'HEAD~1'
-const changed = await gitDiff(baseSha, 'HEAD', appPath)
-process.exit(changed ? 1 : 0)
-```
-
-Falling back to `git merge-base` (not just `HEAD~1`) handles multi-commit
-pushes correctly.
+**Full example:** `~/.claude/skills/turborepo-patterns/examples/vercel-ignore.js`
+— ignoreCommand with three-tier base-SHA fallback (`VERCEL_GIT_PREVIOUS_SHA`
+→ `git merge-base origin/main` → `HEAD~1`) for correct multi-commit pushes.
 
 ## CI patterns
 
@@ -186,37 +151,17 @@ because skipped is treated as success.
 
 ## Bin scripts vs Turbo tasks
 
-A package's `package.json` `bin` field defines an executable shipped with
-the package. Turbo tasks are defined in `turbo.json` and run via
-`turbo run <task>`. They're different:
-
-```json
-// packages/db/package.json
-{
-  "bin": {
-    "db-generate": "./bin/generate.js"
-  },
-  "scripts": {
-    "db:generate": "prisma generate"
-  }
-}
-```
-
-```json
-// packages/db/turbo.json
-{
-  "extends": ["//"],
-  "pipeline": {
-    "db:generate": {
-      "outputs": ["src/generated/**"]
-    }
-  }
-}
-```
+Two different layers — `bin` (in `package.json`) ships an executable to
+downstream consumers; a Turbo task (in `turbo.json`) orchestrates
+monorepo runs and adds caching. Per-package `turbo.json` must use
+`"extends": ["//"]` to inherit the root pipeline.
 
 **Pitfall:** `pnpm --filter @my-org/db db:generate` does NOT use the
-package's `turbo.json` because pnpm recursion bypasses Turbo. To get
-Turbo caching, use `turbo run db:generate --filter=@my-org/db` instead.
+package's `turbo.json` — pnpm recursion bypasses Turbo. To get Turbo
+caching, use `turbo run db:generate --filter=@my-org/db` instead.
+
+**Full example:** `~/.claude/skills/turborepo-patterns/examples/bin-vs-turbo-task.example`
+— paired `package.json` + per-package `turbo.json` for a `db:generate` task.
 
 ## Remote caching
 
