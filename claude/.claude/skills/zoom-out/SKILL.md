@@ -1,6 +1,6 @@
 ---
 name: "[HomebrewSkill] zoom-out"
-description: "Surface from a zoomed-in task back to the big picture. Summarizes what was accomplished and cleans up focus state."
+description: 'Activates on "/zoom-out", "zoom out", or "back to the big picture" — surfacing from a zoomed-in task back to the broader view.'
 triggers:
   - /zoom-out
   - "zoom out"

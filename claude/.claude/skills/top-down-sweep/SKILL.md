@@ -1,6 +1,6 @@
 ---
 name: "[HomebrewSkill] top-down-sweep"
-description: "Breadth-first documentation audit from a named root doc. Walks linked docs, truth-tests every factual claim against the code, applies truth rules (hedge labels, current-state notes), prunes obviously fresh docs, flags bigger drifts as separate sweeps. Bumps last-verified on docs that pass verification. Activates on '/top-down-sweep', 'top-down sweep from <path>', 'audit docs from <path>', 'sweep docs'."
+description: "Activates on '/top-down-sweep', 'top-down sweep from <path>', 'audit docs from <path>', or 'sweep docs'. Use when the user asks for a breadth-first documentation audit from a named root doc (README.md, ARCHITECTURE.md, BRIDGES.md, or similar canonical doc)."
 triggers:
   - /top-down-sweep
   - "top-down sweep"
