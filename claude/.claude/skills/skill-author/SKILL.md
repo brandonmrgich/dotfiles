@@ -87,6 +87,20 @@ same reference, §Examples.
 keyword pool preserved):
 `~/.claude/references/description-format.md`.
 
+## Pressure-test before merge
+
+New **discipline-pressure** skills (those that enforce a procedure
+under conditions where the model is tempted to shortcut) must pass a
+RED → GREEN → REFACTOR cycle before landing.
+
+- **Methodology + fixture format:**
+  `~/.claude/references/skill-pressure-testing.md`.
+- **Runner:** dispatch the `skill-pressure-tester` agent with a
+  fixture path; it returns a verdict + rationalization deltas.
+
+Specialist (domain-knowledge) skills are exempt. Ritual skills run
+the cycle when they encode pressure language.
+
 ## What you must never do
 
 - Do not write skill or agent files without explicit user confirmation
