@@ -91,6 +91,13 @@ active plan and ask whether to run concurrently or pause the other.
 3. If absent: gather inputs, parse the tasks directory, build the
    task list from filename ordering (00-, 01-, 02a-, 02b-, etc.),
    and write the initial state file.
+4. **Anchor-chain check (initialize only, not resume).** Read the master
+   plan front-matter. Soft warnings — display, accept Y/N or
+   implicit-continue, do NOT block:
+   - `from-essay:` missing/empty → surface
+     `"No essay anchored to this plan. Intentional? (Y to continue, N to revisit and add from-essay:.)"`
+   - `affects-docs:` missing/empty AND task count >5 → surface
+     `"No affects-docs: declared. If this plan touches doc-bearing code paths, declare them now for downstream verification."`
 
 ### Phase 1 — Validate the plan
 

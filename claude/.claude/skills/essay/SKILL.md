@@ -114,9 +114,13 @@ Triggers: "resolve the X essay"
 
 1. Read essay
 2. Confirm all `anchors.produced` exist (the artifacts were actually created)
-3. Set `status: resolved`
-4. Optionally add a "Resolution" section summarizing final outcomes
-5. Write
+3. **Anchor-chain nudge.** If `anchors.produced` is missing or `[]`,
+   surface (soft warning, not a block):
+   `"Essay being resolved without anchored produced artifacts. Confirm: was this essay informational only, or did it produce a plan/doc that should be linked?"`
+   User confirms or pauses to update `anchors.produced`.
+4. Set `status: resolved`
+5. Optionally add a "Resolution" section summarizing final outcomes
+6. Write
 
 Resolved is NOT immutable — can be reopened or superseded.
 
