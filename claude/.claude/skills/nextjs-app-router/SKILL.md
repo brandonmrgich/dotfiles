@@ -6,60 +6,43 @@ description: "Use when the prompt or files in scope reference Next.js 13+ App Ro
 
 # Next.js App Router Specialist
 
-Domain expert on the Next.js 13+ App Router. Activates alongside any agent
-role to provide framework-specific guidance.
+Domain expert on Next.js 13+ App Router. Co-activates with agent roles.
 
-## The mental model that matters most
+## Mental model
 
-Server components are the default. Client components are an opt-in via
-`"use client"` at the top of a file. Once a file is marked `"use client"`,
-every component imported into it becomes a client component too — the
-boundary is one-directional from the entry point.
+Server components are the default; `"use client"` opts in. Once a file
+is marked `"use client"`, every component it imports becomes client too
+— the boundary is one-directional. A server component can render a
+client child; a client component can render a server child only via
+the `children` prop. Push `"use client"` as deep toward leaves as
+possible.
 
-A server component CAN render a client component as a child. A client
-component CANNOT render a server component as a child *except* via the
-`children` prop pattern.
+## Server vs client component
 
-## Server vs client component decision tree
-
-Use a server component when:
-- Fetching data (always prefer this)
-- Accessing backend resources directly (DB, filesystem, internal APIs)
-- Keeping sensitive info on the server (API keys, tokens)
-- Reducing client bundle size
-- The component does not need interactivity, state, or browser APIs
-
-Use a client component when:
-- You need useState, useEffect, useReducer, or other React hooks
-- You need event handlers (onClick, onChange, onSubmit)
-- You need browser APIs (window, localStorage, navigator)
-- You need third-party libraries that depend on the above
-
-The default should be server. Push the `"use client"` boundary as deep
-into the leaf components as possible.
+| Use server when | Use client when |
+|---|---|
+| Fetching data (always prefer) | Need `useState` / `useEffect` / hooks |
+| DB, filesystem, internal API access | Event handlers (`onClick`, `onChange`) |
+| Keeping secrets server-side | Browser APIs (`window`, `localStorage`) |
+| No interactivity / state / browser APIs | Third-party libs that need any of the above |
 
 ## Server actions
 
-Server actions are async functions marked with `"use server"` that can be
-called from both server and client components. They run on the server.
+Async functions marked `"use server"`, callable from server or client;
+always run server-side.
 
 ```ts
 // app/actions.ts
 "use server"
 export async function updateRelease(formData: FormData) {
-  // runs server-side, can hit DB directly
   revalidatePath("/releases")
 }
 ```
 
-Use server actions for:
-- Form submissions (works without client JavaScript)
-- Mutations that need to invalidate cached data
-- Operations where you'd otherwise create a route handler just to receive a POST
-
-Don't use server actions for:
-- Read operations (use server components instead)
-- Anything that needs to return data to a non-React client (use a route handler)
+Use for: form submissions (works without client JS), mutations that
+invalidate cached data, POST endpoints you'd otherwise hand-roll.
+Avoid for: reads (use server components), non-React clients (use a
+route handler).
 
 ## Route handlers vs server actions
 
@@ -71,7 +54,9 @@ Don't use server actions for:
 | Mutation tied to revalidation | Server action |
 | Public data API | Route handler |
 
-## The four caching layers (the #1 source of "why isn't my data updating" bugs)
+## The four caching layers
+
+The #1 source of "why isn't my data updating" bugs.
 
 | Cache | Scope | Lifetime | Invalidation |
 |---|---|---|---|
@@ -80,15 +65,13 @@ Don't use server actions for:
 | Full Route Cache | All requests, server | Until rebuild | revalidatePath, route deploys |
 | Router Cache | Per-user, client | Session | router.refresh, hard navigation |
 
-When data isn't updating after a mutation:
-1. Did you call `revalidatePath` or `revalidateTag` from the server action?
-2. Is the route segment dynamic or static? Static routes need explicit revalidation.
-3. Is the client Router Cache holding stale data? `router.refresh()` busts it.
+Stale-data triage: did the action call `revalidatePath` / `revalidateTag`?
+Is the segment static (needs explicit revalidation)? Is the client Router
+Cache stale (`router.refresh()` busts it)?
 
 ## Form patterns
 
 ```tsx
-// Modern form pattern with useFormState + useFormStatus
 "use client"
 import { useFormState, useFormStatus } from "react-dom"
 import { updateRelease } from "./actions"
@@ -110,88 +93,61 @@ export function ReleaseForm({ release }) {
 }
 ```
 
-This pattern works without client JS (server actions degrade gracefully)
-and integrates cleanly with form state machine patterns.
+`useFormState` + `useFormStatus` degrade gracefully (works without
+client JS) and integrate cleanly with form state machines.
 
 ## BFF (backend-for-frontend) proxy pattern
 
-A common monorepo pattern: an admin Next.js app proxies to a separate API
-to avoid CORS and centralize cross-cutting concerns.
+Common monorepo shape: an admin Next.js app proxies to a separate
+upstream API to keep the browser same-origin (no CORS, cookies
+survive) and to centralize auth/tracing/retries server-side.
 
 ```
-Browser
-  ↓ same-origin
-Admin Next.js (apps/admin)
-  ↓ /api/admin/* route handlers (server-side)
-Upstream API (apps/api)
+Browser → Admin Next.js → /api/admin/* route handlers → Upstream API
 ```
 
-Why this pattern:
-- Browser only sees same-origin requests — no CORS, cookies survive
-- Server-side proxy can add auth, tracing, retries
-- Upstream API stays focused on data, not browser concerns
-
-Implementation pattern:
-1. `app/api/admin/<resource>/route.ts` — 5-line file that delegates to a
-   shared proxy helper
-2. Shared helper forwards method, path, query, body, cookies, headers
-3. Client components call same-origin `/api/admin/...` via typed helpers
-
-If a project uses this pattern, it likely has a project-local specialist
-that documents the specific helper functions and conventions. Defer to
-those.
+Implementation: thin `app/api/admin/<resource>/route.ts` files
+delegate to a shared proxy helper that forwards method, path, query,
+body, cookies, headers. Clients call same-origin `/api/admin/...`
+via typed helpers. Project-local specialists own the specific helper
+conventions — defer to them.
 
 ## Hydration with persisted client state
 
-When using Zustand persist (or similar) with SSR, hydration mismatches
-happen because the server emits empty state while the client emits
-restored-from-localStorage state.
-
-The fix: `skipHydration: true` on the persist config prevents auto-hydration;
-manual `persist.rehydrate()` in a client `useEffect` ensures the first paint
-matches the server, then state restores after.
+Zustand persist (or similar) + SSR mismatches: server emits empty
+state, client emits restored-from-localStorage state. Fix: set
+`skipHydration: true` on the persist config and call
+`persist.rehydrate()` from a client `useEffect` so first paint matches
+the server, then state restores.
 
 **Full code:** `~/.claude/skills/nextjs-app-router/patterns/hydration.example.tsx`
-— persisted Zustand with skipHydration + manual rehydrate.
 
 ## Theme via cookie (SSR-correct)
 
-Avoid `next/script` theme bootstrap (triggers React 19 warnings). Use a
-cookie + `Sec-CH-Prefers-Color-Scheme` pattern: a server component reads
-both in `app/layout.tsx` and emits the correct theme class on first paint.
-A client `ThemeProvider` then syncs cookie + localStorage on changes. No
-client-side script in the React tree.
+Avoid `next/script` bootstrap (React 19 warnings). Pattern: a server
+component in `app/layout.tsx` reads a cookie + `Sec-CH-Prefers-Color-Scheme`
+and emits the theme class on first paint; a client `ThemeProvider`
+syncs cookie + localStorage on changes. No client script in the tree.
 
 **Full code:** `~/.claude/skills/nextjs-app-router/patterns/theme-cookie.example.ts`
-— SSR-correct theme via cookie + Sec-CH-Prefers-Color-Scheme.
 
 ## Common pitfalls
 
-1. **Importing server-only code into client components** — install and use
-   `server-only` package to fail loudly at build time
-2. **`"use client"` on layout** — turns the entire subtree into client
-   components, bloats bundle
-3. **Forgetting `revalidatePath` after server action mutations** — UI
-   shows stale data
-4. **Using `cookies()` or `headers()` in static routes** — implicitly
-   makes the route dynamic; surprising bundle/perf changes
-5. **Returning Date objects from server components** — must serialize;
-   pass strings or numbers to client components
-6. **Hydration mismatches** from server-rendered timestamps, random IDs,
-   `Math.random()`, or persisted client stores without `skipHydration`
-7. **Treating `loading.tsx` as a global loading state** — it's per-segment;
-   nest carefully
-8. **Forgetting `generateStaticParams`** for dynamic routes that should
-   be static
-9. **Using `router.push()` expecting fresh data** — Router Cache returns
-   stale; use `router.refresh()` first
-10. **Mixing `"use client"` and `"use server"` in the same file** — illegal
+1. **Server-only code imported into clients** — use the `server-only` package to fail at build.
+2. **`"use client"` on a layout** — turns the whole subtree client; bloats bundle.
+3. **Forgetting `revalidatePath` after a server action mutation** — UI stays stale.
+4. **`cookies()` / `headers()` in a static route** — silently makes it dynamic.
+5. **Returning Date objects from server components** — must serialize to strings/numbers.
+6. **Hydration mismatches** from server-rendered timestamps, random IDs, `Math.random()`, or persisted stores without `skipHydration`.
+7. **Treating `loading.tsx` as global** — it's per-segment; nest carefully.
+8. **Missing `generateStaticParams`** for dynamic routes meant to be static.
+9. **`router.push()` expecting fresh data** — Router Cache stale; `router.refresh()` first.
+10. **Mixing `"use client"` and `"use server"` in one file** — illegal.
 
 ## Streaming and Suspense
 
-`loading.tsx` automatically wraps the page in a Suspense boundary. For
-finer control, use `<Suspense>` directly to stream parts of a page while
-others load.
+`loading.tsx` wraps the page in Suspense automatically. For finer
+control, use `<Suspense>` directly to stream slow parts.
 
 ```tsx
 <Suspense fallback={<Skeleton />}>
@@ -201,11 +157,7 @@ others load.
 
 ## What you must never do
 
-- Do not advise Pages Router patterns (getServerSideProps, getStaticProps)
-  for App Router code.
-- Do not recommend `useEffect` for data fetching in server components
-  (server components don't run `useEffect`).
-- Do not advise calling server actions from a route handler — call the
-  underlying logic directly.
-- Do not advise project-specific BFF helper patterns; defer to project-local
-  specialists if they exist.
+- Don't advise Pages Router patterns (`getServerSideProps`, `getStaticProps`) on App Router code.
+- Don't recommend `useEffect` for data fetching in server components (they don't run effects).
+- Don't call server actions from a route handler — call the underlying logic directly.
+- Don't advise project-specific BFF helpers; defer to project-local specialists.
