@@ -1,11 +1,12 @@
 ---
 title: Custom skill system audit vs. superpowers
-status: open
+status: resolved
 created: 2026-04-28
-last-active: 2026-04-28
+last-active: 2026-05-03
 tags: [skills, audit, methodology, claude-config, roadmap]
 anchors:
-  produced: []
+  produced:
+    - ~/dotfiles/.claude/plans/skills-trim-and-discipline/MasterPlan.md
   references:
     - cross-claude-mantras-and-skills-integration.md
     - essay-system.md
@@ -528,3 +529,41 @@ If you are the future agent picking this up:
 
 The system is in good shape. Closing these gaps is incremental
 hardening, not a rewrite.
+
+---
+
+## Outcome
+
+This essay's backlog was executed as the `skills-trim-and-discipline` plan (38 tasks across 9 phases). All P0/P1 items closed; P2/P3 items closed except as flagged below.
+
+### Gap-by-gap closure status
+
+- **Gap 1 — No discipline-pressure skills (P0)** — **CLOSED.** Phase 5 shipped four discipline skills with iron-laws and pressure-tested fixtures: `systematic-debugging`, `verification-before-completion`, `test-driven-development`, `design-before-code`. RED→GREEN→REFACTOR traces in commit bodies are hypothetical-labeled (implementer scope cannot dispatch sub-sub-agents); empirical re-run is Phase-8 follow-up #7 in MasterPlan.
+
+- **Gap 2 — No `using-superpowers`-style meta-rule (P1.5)** — **CLOSED.** Phase 6 shipped `using-homebrew-skills` meta-skill with rationalization table. Activates on every first response in a session.
+
+- **Gap 3 — Code-review discipline absent (P1.6, P1.7)** — **CLOSED.** Phase 6 shipped `receiving-code-review` (6-step protocol, ban on performative agreement) and `requesting-code-review` (5-item pre-request checklist). Cross-referenced to `github` and `pr-review-toolkit:code-reviewer` agent.
+
+- **Gap 4 — No "finishing a branch" ritual (P1.8)** — **CLOSED.** Phase 6 shipped `finishing-a-branch` skill with 7-item closeout checklist. Defers to `plan-executor` Phase 4 when a plan is active.
+
+- **Gap 5 — Plan format under-specified for sub-agent execution (P2.11)** — **CLOSED.** Task 31 (Phase 7) added a Phase-1 task-quality gate to `plan-executor` and updated `plan-executor-implementer` agent to reject under-specified tasks back to the orchestrator rather than improvise.
+
+- **Gap 6 — No skill-testing methodology (P2.12)** — **CLOSED.** Phase 4 (Tasks 19–20) added `references/skill-pressure-testing.md`, the `skill-pressure-tester` agent, and updated `skill-author` with the RED → GREEN → REFACTOR cycle. Methodology PASS at Task 20 audit.
+
+- **Gap 7 — Description format diverges from CSO best practices (P2.9)** — **CLOSED.** Phase 3 (Tasks 14–18) wrote `references/description-format.md`, rewrote all 20 descriptions ≤1024 chars with "Use when…"/"Activates when…" leads, and verified 14/14 keyword retention at Task 18 audit. Phases 5+6 shipped new skills compliant with the format from authoring time.
+
+- **Gap 8 — Token budget not stated (essay #9 / P2.10 + P3.1)** — **PARTIAL.** Phase 2 trims established the references/examples/patterns pattern at scale; Phase 8 / Task 34 shipped a per-class budget linter as a pre-commit hook. **12 of 28 skills still over body budget** at Task 37 audit (5 specialists + plan-executor + 4 ritual descriptions + 2 misc). Tracked as Phase-8 follow-ups #1–5 (prose-pruning) for the source essay's measured outcome — see cross-reference below.
+
+- **Gap 9 — No slash commands for most-invoked workflows (P3.13)** — **CLOSED.** Phase 8 / Task 33 shipped a slash-commands plugin: `/zoom-in`, `/zoom-out`, `/session-ready`, `/sweep`, `/audit-task`. Verified live in Task 37 audit's skill picker.
+
+- **Gap 10 — Anchor-chain enforcement weaker than design (P3.14)** — **CLOSED.** Task 32 (Phase 7) added soft anchor-chain warnings to `plan-executor` Phase 0 (warn when `from-essay:` or `affects-docs:` missing) and to the `essay` skill's Resolve mode (warn when `anchors.produced:` empty on resolve). Soft-warning model preserved — does not block.
+
+### Cross-reference to Phase-8 follow-ups
+
+The 8 unresolved items carried forward from this plan are listed in:
+- `~/dotfiles/.claude/plans/skills-trim-and-discipline/MasterPlan.md` §"Phase-8 follow-ups (carry-forward)"
+- `~/.claude/essays/skill-system-token-efficiency-audit.md` §"Phase-8 follow-ups (carry-forward)" (same list, mirrored)
+
+Items #1–5 are prose-pruning sub-tasks for over-budget skill bodies. Item #6 is a manual cold-session smoke check covering five deferred audit gates. Item #7 is the empirical RED-dispatch re-run for the 8 discipline + ritual skills. Item #8 is a one-time YAML-quoting sweep across project-local skill dirs.
+
+These are non-blocking for plan closeout; they represent quality-residue work that didn't fit the per-task budget of this plan but should land before the next major skill-system audit cycle.
