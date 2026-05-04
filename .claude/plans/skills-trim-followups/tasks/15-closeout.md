@@ -1,12 +1,22 @@
-# Task 11 — Closeout: parent essays updated; this plan resolved; umbrella PR
+# Task 15 — Closeout: parent essays updated; this plan resolved; closeout PR
 
-**Phase:** 3 (Cleanup + closeout)
+**Phase:** 3 (Cleanup + closeout) — but runs LAST, after Phase 4
 **Agent:** plan-executor-documenter
 **Produces PR:** Yes (closeout PR — user-merged)
 
 ## Goal
 
 Close the follow-ups plan. Update parent essays' "Measured outcome" sections with followup deltas. Mark this plan resolved. Open the closeout PR. Orchestrator places v3.2 tag on the closeout commit before user-merge.
+
+## Pre-flight: raise deferred items
+
+**Before any closeout work**, read `.claude/plan-states/skills-trim-followups.json` → `deferred_items[]`. For each item, surface to the user with the listed `options_when_raised`. Do NOT proceed with closeout until each deferred item has an explicit user decision recorded. The user's chosen option for each item must be reflected in:
+- The closeout commit body (which option was chosen + brief rationale).
+- Essay #9's "Followup outcome" section (CLOSED / WAIVED / DEFERRED-TO-FUTURE-PLAN).
+- The parent plan's carry-forward update if the deferred item was originally a parent-plan carry-forward.
+
+Known deferred items as of plan extension (2026-05-04):
+- **phase-2-red-dispatches** (Tasks 07, 08): RED dispatches for 8 discipline+ritual skills. Skipped due to structural blocker. User-confirmed defer; must raise here.
 
 ## Files
 
