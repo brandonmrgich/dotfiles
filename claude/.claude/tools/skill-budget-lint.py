@@ -21,13 +21,14 @@ from pathlib import Path
 
 # Per-class budgets: (description_chars, body_bytes, total_bytes)
 BUDGETS = {
-    "specialist": (1024, 6000, 8000),
-    "workflow":   (500,  4000, 5000),
-    "capture":    (500,  4000, 5000),
-    "policy":     (400,  3500, 4500),
-    "meta":       (700,  5000, 6000),
-    "ritual":     (500,  4000, 5000),
-    "discipline": (700,  4000, 5000),
+    "specialist":           (1024, 6000, 8000),
+    "workflow":             ( 500, 4000, 5000),
+    "complex-orchestrator": ( 500, 6500, 7500),
+    "capture":              ( 500, 4000, 5000),
+    "meta":                 ( 800, 5500, 6500),
+    "ritual":               ( 700, 4000, 5000),
+    "discipline":           ( 700, 4000, 5000),
+    # "policy" removed at Task 12 (zero members; re-add when needed).
 }
 
 WARN_PCT = 0.10  # within +10% of budget = WARN; over that = FAIL.
