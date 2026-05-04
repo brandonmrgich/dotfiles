@@ -30,7 +30,9 @@ the lint result from 12 OK / 4 WARN / 12 FAIL toward all-OK across all
 | 0 — Setup | Discovery + setup PR | Captures pre-followup baseline; tracks plan dir; setup PR merges before phase work begins |
 | 1 — Prose pruning | 5 specialist body trims (ddex → nextjs → royalty-splits → turborepo → plan-executor) | Mechanical work; budget linter gates each. Sequenced by yield (largest first); independent — could parallelize but kept sequential per orchestrator principle |
 | 2 — Verification | Real RED dispatches for 8 discipline+ritual skills | Iterates skill bodies if new rationalizations surface. Runs after Phase 1 so prose-pruning doesn't invalidate captured rationalizations |
-| 3 — Cleanup + closeout | YAML quoting sweep; cold-session smoke (manual user run); update parent essays' Measured outcome with followup deltas; mark this plan resolved | Capstone — single user-run smoke covers all parent-plan deferred checks |
+| 3 — Cleanup | YAML quoting sweep; cold-session smoke (manual user run) | Closes parent-plan deferred checks |
+| 4 — Extension and recalibration | Audit linter targets; introduce complex-orchestrator class; apply recalibrations; address remaining FAILs; Phase 4 audit gate | User-added at Phase-1-audit boundary: linter targets feel arbitrary, plan-executor body needs its own class, and 7 out-of-scope FAILs from Phase 1 should be addressed (recalibrate or trim). Runs last because Tasks 11-14 may modify skills already touched by Phases 1-3 |
+| 9 (closeout) | Update parent essays' Measured outcome with followup deltas; mark this plan resolved; closeout PR | Capstone |
 
 ## Scope
 
@@ -149,7 +151,11 @@ that closes the plan.
 | 08 | 2 | tasks/08-audit-red-dispatches.md | Verify rationalization deltas captured; iterate skill bodies if needed | auditor | gate |
 | 09 | 3 | tasks/09-yaml-quoting-sweep.md | Grep project-local skill dirs for unquoted descriptions w/ colons | discovery | (closeout) |
 | 10 | 3 | tasks/10-cold-session-smoke.md | Manual user-run cold-session smoke; record observation | (user) | (closeout) |
-| 11 | 3 | tasks/11-closeout.md | Update parent essays' Measured outcome with followup deltas; mark this plan resolved; umbrella PR | documenter | closeout PR |
+| 11 | 4 | tasks/11-audit-linter-targets.md | Audit per-class budget origin/justification; recommend recalibrations | discovery | (closeout) |
+| 12 | 4 | tasks/12-apply-linter-recalibrations.md | Introduce complex-orchestrator class; apply Task-11 recalibrations | implementer | (closeout) |
+| 13 | 4 | tasks/13-address-remaining-fails.md | Prose-prune any skills still FAIL post-recalibration (essay, session-ready, worktree-orchestrator, plan-auditor likely) | implementer | (closeout) |
+| 14 | 4 | tasks/14-audit-phase-4.md | Phase 4 audit gate: verify linter recalibrated + remaining FAILs addressed | auditor | gate |
+| 15 | 3 | tasks/15-closeout.md | Update parent essays' Measured outcome with followup deltas; mark this plan resolved; closeout PR | documenter | closeout PR |
 
 Tasks: `~/dotfiles/.claude/plans/skills-trim-followups/tasks/`
 Audits: `~/dotfiles/.claude/plans/skills-trim-followups/audits/`

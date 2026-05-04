@@ -81,7 +81,8 @@ def worst(verdicts: list[str]) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    assert __doc__, "module docstring required"
+    ap = argparse.ArgumentParser(description=(__doc__).splitlines()[0])
     ap.add_argument(
         "--fail",
         action="store_true",
