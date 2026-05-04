@@ -3,6 +3,7 @@
 .claude/plan-completion-report.md
 .claude/plans/*
 !.claude/plans/skills-trim-and-discipline/
+!.claude/plans/skills-trim-followups/
 .claude/settings.local.json
 
 .DS_Store
