@@ -12,199 +12,120 @@ and parallelizes the task graph.
 
 ## The mental model
 
-A `turbo.json` file declares a **pipeline** — a graph of tasks (lint,
-typecheck, build, test) with dependencies between them. Turborepo:
-
-1. Computes the inputs to each task (source files, env vars, dependency
-   outputs)
-2. Hashes those inputs
-3. Looks up the hash in a cache (local or remote)
-4. If hit: replays the cached output
-5. If miss: runs the task, captures the output, caches it
-
-The cache hit ratio is the whole game. Tasks that don't cache cleanly
-defeat the purpose.
+`turbo.json` declares a **pipeline** — a graph of tasks (lint, typecheck,
+build, test) with dependencies. For each task: hash inputs (source files,
+env vars, dependency outputs) → cache lookup → replay on hit, run + cache
+on miss. Cache hit ratio is the whole game; tasks that don't cache
+cleanly defeat the purpose.
 
 ## turbo.json structure
 
 **Full example:** `~/.claude/skills/turborepo-patterns/examples/turbo.json.example`
-— root pipeline covering build, lint, typecheck, test, and dev with the
+— root pipeline covering build, lint, typecheck, test, dev with the
 common dependsOn/outputs/env patterns.
-
-Field meanings:
 
 | Field | Purpose |
 |---|---|
-| `dependsOn` | Tasks that must complete first; `^` prefix means "this task on dependencies" |
+| `dependsOn` | Tasks that must complete first; `^` prefix = "this task on dependencies" |
 | `outputs` | Globs of files to cache; empty array = cache the run but not files |
 | `env` | Env vars that affect this task's output (cache invalidates on change) |
 | `globalEnv` | Env vars that affect ALL tasks |
 | `globalDependencies` | Files outside specific packages that affect all tasks |
-| `cache` | Set to `false` for tasks that shouldn't cache (e.g., `dev`) |
+| `cache` | `false` for tasks that shouldn't cache (e.g., `dev`) |
 | `persistent` | For long-running tasks like `dev` servers |
 
 ## globalEnv: when to use, when not to
 
-`globalEnv` invalidates EVERY task's cache when the value changes. Use
-sparingly:
+`globalEnv` invalidates EVERY task's cache when the value changes. Use sparingly.
 
-✅ Good `globalEnv` candidates:
-- Variables that affect what apps render at build time
-  (e.g. `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_BUILD_TYPE`)
-- Variables that change which paths apps proxy to
-- Variables that toggle build-time feature flags
+✅ Good:
+- Vars that affect what apps render at build time (`NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_BUILD_TYPE`)
+- Vars that change which paths apps proxy to
+- Build-time feature flag toggles
 
-❌ Bad `globalEnv` candidates:
-- Variables only one app uses (put in that task's `env` instead)
-- Variables that don't affect output (logging levels, etc.)
-- Secrets that aren't read at build time
+❌ Bad:
+- Vars only one app uses → put in that task's `env`
+- Vars that don't affect output (logging levels)
+- Secrets not read at build time
 
-If a variable is only used by one task in one workspace, prefer per-task
-`env` configuration:
-
-```json
-{
-  "pipeline": {
-    "@my-org/api#build": {
-      "env": ["DATABASE_URL", "API_SECRET"]
-    }
-  }
-}
-```
+If a variable is only used by one task, prefer per-task `env` (e.g.
+`"@my-org/api#build": { "env": ["DATABASE_URL", "API_SECRET"] }`).
 
 ## Scoped runs: --filter and --affected
 
 ```bash
-# Run lint only in the admin app and its dependencies
-turbo run lint --filter=@my-org/admin
-
-# Run lint only in workspaces affected by changes since main
-turbo run lint --affected
-
-# Run lint in workspaces matching a path
-turbo run lint --filter='./apps/*'
-
-# Run lint in workspaces named "admin" only (no deps)
-turbo run lint --filter=@my-org/admin --no-deps
+turbo run lint --filter=@my-org/admin       # app + its deps
+turbo run lint --filter=@my-org/admin --no-deps  # app only
+turbo run lint --filter='./apps/*'          # path glob
+turbo run lint --affected                   # changed workspaces (CI on PRs)
 ```
 
-`--affected` is what you want for CI on PRs. It uses git diff to determine
-which workspaces changed and runs only their tasks (plus dependent
-workspaces).
-
-For `push` to the default branch, `--affected` compares `HEAD` to the
-previous commit by default. If your CI uses a different base (like
-`origin/main`), pass `--affected[github.event.before]...[github.event.after]`
-in CI env to avoid comparing `HEAD` to itself (which would skip everything).
+`--affected` uses git diff. On `push` to default branch it compares
+`HEAD` to the previous commit by default — if your CI uses a different
+base (like `origin/main`), pass
+`--affected[github.event.before]...[github.event.after]` to avoid
+comparing `HEAD` to itself (skips everything). `--scope` is the legacy
+synonym for `--filter`; prefer `--filter`.
 
 ## The pnpm + Turbo + Vercel three-way
 
-A common monorepo deployment pattern:
-
-1. **pnpm workspaces** — defines what packages exist
-2. **Turborepo** — orchestrates tasks across them
-3. **Vercel** — deploys individual apps
-
-The friction point: Vercel rebuilds an app on every push by default, even
-if nothing in that app changed. Solution: `vercel.json` per app with
-`ignoreCommand`:
-
-```json
-{
-  "ignoreCommand": "node ../../scripts/vercel-ignore-app-changes.mjs"
-}
-```
-
-The script runs `git diff` and exits 0 (skip build) if nothing in the
-app's directory or its workspace deps changed.
+pnpm workspaces define what packages exist; Turborepo orchestrates tasks
+across them; Vercel deploys individual apps. Friction: Vercel rebuilds
+every app on every push by default. Solution: per-app `vercel.json` with
+an `ignoreCommand` script that runs `git diff` and exits 0 (skip build)
+when nothing in the app's directory or its workspace deps changed.
 
 **Full example:** `~/.claude/skills/turborepo-patterns/examples/vercel-ignore.js`
-— ignoreCommand with three-tier base-SHA fallback (`VERCEL_GIT_PREVIOUS_SHA`
-→ `git merge-base origin/main` → `HEAD~1`) for correct multi-commit pushes.
+— ignoreCommand with three-tier base-SHA fallback
+(`VERCEL_GIT_PREVIOUS_SHA` → `git merge-base origin/main` → `HEAD~1`)
+for correct multi-commit pushes.
 
 ## CI patterns
 
-### Path classification + heavy job gating
+**Path classification + heavy job gating.** A small "classify" step
+inspects changed paths and outputs a boolean; heavy jobs (install, Turbo,
+build) gate on it so docs-only PRs skip the full pipeline.
 
-Pattern: a small "classify" step inspects changed paths and outputs a
-boolean. Heavy jobs (install, Turbo, build) gate on that boolean:
-
-```yaml
-# Pseudocode
-- id: classify
-  run: |
-    if git diff --name-only HEAD~1 | grep -vE '^(docs/|README\.md)' > /dev/null; then
-      echo "heavy=true" >> $GITHUB_OUTPUT
-    fi
-
-- if: steps.classify.outputs.heavy == 'true'
-  run: pnpm install && turbo run lint typecheck test build --affected
-```
-
-This prevents docs-only PRs from spinning up the full build pipeline.
-
-### Required check naming
-
-Branch protection requiring a "single green check" works best with a
-final aggregator job ("CI Status") that depends on all real jobs. When
-heavy jobs are skipped (docs-only PRs), the aggregator stays green
-because skipped is treated as success.
+**Required check naming.** Branch protection requiring a "single green
+check" works best with a final aggregator job ("CI Status") that depends
+on all real jobs — skipped is treated as success, so the aggregator
+stays green on docs-only PRs.
 
 ## Bin scripts vs Turbo tasks
 
-Two different layers — `bin` (in `package.json`) ships an executable to
+Two different layers: `bin` (in `package.json`) ships an executable to
 downstream consumers; a Turbo task (in `turbo.json`) orchestrates
 monorepo runs and adds caching. Per-package `turbo.json` must use
 `"extends": ["//"]` to inherit the root pipeline.
 
 **Pitfall:** `pnpm --filter @my-org/db db:generate` does NOT use the
-package's `turbo.json` — pnpm recursion bypasses Turbo. To get Turbo
-caching, use `turbo run db:generate --filter=@my-org/db` instead.
+package's `turbo.json` — pnpm recursion bypasses Turbo. Use
+`turbo run db:generate --filter=@my-org/db` for caching.
 
 **Full example:** `~/.claude/skills/turborepo-patterns/examples/bin-vs-turbo-task.example`
 — paired `package.json` + per-package `turbo.json` for a `db:generate` task.
 
 ## Remote caching
 
-Local cache is at `.turbo/`. For team/CI sharing, configure remote cache:
-
-```bash
-turbo login
-turbo link
-```
-
-Or set `TURBO_TOKEN` and `TURBO_TEAM` env vars in CI.
-
-Remote cache fills on first build; subsequent builds (CI runners,
-teammates) hit the cache and skip work.
+Local cache is at `.turbo/`. For team/CI sharing: `turbo login && turbo
+link`, or set `TURBO_TOKEN` and `TURBO_TEAM` in CI. Remote cache fills
+on first build; subsequent builds (CI runners, teammates) hit it.
 
 ## Common pitfalls
 
-1. **Caching tasks that read .env files outside `env`/`globalDependencies`**
-   — cache hits when it shouldn't, deploys break
-2. **Forgetting outputs for cacheable tasks** — task runs but nothing
-   gets cached
-3. **Putting secrets in `globalEnv`** — invalidates every cache when
-   the secret rotates
-4. **Using `--filter='[main]'`** without understanding "since main" —
-   changes since main, not "in main"
-5. **`turbo run dev` with `cache: true`** — `dev` should be `cache: false,
-   persistent: true`
-6. **Per-workspace `turbo.json` not extending root** — must use
-   `"extends": ["//"]`
-7. **pnpm bypassing Turbo** — `pnpm --filter X build` skips Turbo;
-   use `turbo run build --filter=X`
-8. **Comparing `HEAD` to itself on push to default branch** — `--affected`
-   needs explicit before/after refs in CI
-9. **Including build artifacts in `globalDependencies`** — cache thrashes
-   on every build
-10. **Treating Turbo as a build tool** — it's an orchestrator; the
-    actual building is done by per-package scripts
+1. **Reading `.env` files outside `env`/`globalDependencies`** — cache hits when it shouldn't, deploys break
+2. **Forgetting `outputs` for cacheable tasks** — task runs but nothing gets cached
+3. **Secrets in `globalEnv`** — invalidates every cache when the secret rotates
+4. **`--filter='[main]'` misread** — that's "since main", not "in main"
+5. **`turbo run dev` with `cache: true`** — `dev` should be `cache: false, persistent: true`
+6. **Per-workspace `turbo.json` not extending root** — must use `"extends": ["//"]`
+7. **pnpm bypassing Turbo** — `pnpm --filter X build` skips Turbo; use `turbo run build --filter=X`
+8. **`HEAD` compared to itself on push to default** — `--affected` needs explicit before/after refs in CI
+9. **Build artifacts in `globalDependencies`** — cache thrashes on every build
+10. **Treating Turbo as a build tool** — it's an orchestrator; per-package scripts do the actual building
 
 ## What you must never do
 
 - Do not advise replacing pnpm/npm/yarn with Turbo — they're complementary
-- Do not advise running long-running processes (`dev`, `watch`) without
-  `persistent: true` and `cache: false`
-- Do not put secrets or per-deployment values in `globalEnv` —
-  invalidates everything
+- Do not advise running `dev`/`watch` without `persistent: true` and `cache: false`
+- Do not put secrets or per-deployment values in `globalEnv` — invalidates everything
