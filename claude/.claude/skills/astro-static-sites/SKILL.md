@@ -1,5 +1,6 @@
 ---
 name: astro-static-sites
+class: specialist
 description: "Use when the prompt or files in scope reference Astro: .astro files, astro.config.{mjs,ts}, @astrojs/ integrations (React, Vue, Svelte, Tailwind, MDX, sitemap), content collections (defineCollection, getCollection, getEntry), Astro.props / Astro.glob / Astro.url / Astro.request, getStaticPaths, Astro middleware, the Islands Architecture and client:* hydration directives (client:load / client:idle / client:visible / client:media / client:only), static vs hybrid vs server output, build-time vs request-time data fetching, deployment to Vercel / Netlify / Cloudflare / static hosts, and View Transitions / ViewTransitions component. Suits marketing landing pages, documentation sites, and content-driven sites. Do NOT trigger for generic markdown / MDX questions unrelated to Astro framework features. Do NOT trigger for static-site questions when the framework is Next.js, Gatsby, or other."
 ---
 

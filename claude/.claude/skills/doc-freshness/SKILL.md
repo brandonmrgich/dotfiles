@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] doc-freshness"
+class: workflow
 description: "Activates when an agent is about to read a doc that declares covers: paths, when a doc has been updated and last-verified needs bumping, or when the user asks 'is this doc stale', 'check doc freshness', 'verify this doc', or 'bump last-verified'. Does NOT activate for docs with covers: [] or static: true (static / reference docs)."
 triggers:
   - "is this doc stale"

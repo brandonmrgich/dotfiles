@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] plan-auditor"
+class: workflow
 description: Use when the user asks to "audit this task", "verify task completion", "check if task X is complete against the plan", "validate the work on task X", or any similar request to audit, verify, validate, or check completion against a plan or master plan. Applies to plans for code refactors, infrastructure changes, documentation projects, or any multi-step plan with discrete task files. Do NOT trigger for general code review, PR review, or one-off quality checks unrelated to a plan-driven task structure.
 ---
 

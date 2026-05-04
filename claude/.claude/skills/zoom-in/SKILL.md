@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] zoom-in"
+class: workflow
 description: 'Activates on "/zoom-in", "zoom in on", or "zoom in" — narrowing focus to a specific task. Handles both fuzzy/exploratory tasks (interactive) and well-scoped tasks (autonomous sub-agent dispatch with optional plan output).'
 triggers:
   - /zoom-in

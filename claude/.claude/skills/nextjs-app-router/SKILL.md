@@ -1,5 +1,6 @@
 ---
 name: nextjs-app-router
+class: specialist
 description: "Use when the prompt or files in scope reference Next.js 13+ App Router: server / client components, 'use client' / 'use server' directives, server actions, route handlers, middleware, app/ routing files (layout.tsx / page.tsx / loading.tsx / error.tsx / not-found.tsx), generateMetadata, generateStaticParams, Request/Data/Full Route/Router Cache layers, revalidatePath / revalidateTag / unstable_cache / router.refresh, cookies / headers / redirect / notFound, useFormStatus / useFormState / useOptimistic, parallel and intercepting routes, route groups, dynamic and catch-all segments, BFF proxy under app/api/, skipHydration / persist.rehydrate / hydration mismatch, next.config.{js,mjs}. Do NOT trigger for Pages Router (pages/) or for generic React unrelated to framework features. Do NOT trigger for a specific monorepo's BFF wiring — defer to project-local specialists (music-platform-api, music-platform-architecture). DO trigger for core framework API questions even inside a monorepo."
 ---
 

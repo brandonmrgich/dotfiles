@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] receiving-code-review"
+class: ritual
 description: "Use when responding to PR review comments, addressing review feedback, working through reviewer questions, or applying review-suggested changes. Activates on phrases like 'addressing review comments', 'review feedback', 'PR comment', 'reviewer says', 'requested changes'. Enforces iron-law: DO NOT AGREE PERFORMATIVELY. EVALUATE BEFORE RESPONDING. 6-step protocol: READ -> UNDERSTAND -> VERIFY -> EVALUATE -> RESPOND -> IMPLEMENT. Bans phrases 'you're absolutely right', 'great catch', 'good point' when used without verification. Do NOT trigger for trivial style nits or already-decided team conventions."
 ---
 

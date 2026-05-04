@@ -1,5 +1,6 @@
 ---
 name: turborepo-patterns
+class: specialist
 description: "Use when the prompt or files in scope reference Turborepo: turbo.json / turbo.config.js (root vs workspace-level), pipeline tasks, dependsOn, outputs, cache, persistent, env, globalEnv, turbo run / build / dev / lint / typecheck / prune / gen, --filter / --affected / --scope, the input-based caching model (file inputs, env vars, dependency outputs), remote cache configuration, vercel.json ignoreCommand / vercel-ignore for preview-build skipping, pnpm-workspace.yaml + Turborepo integration, package.json bin scripts vs Turbo tasks pitfalls, and monorepo build orchestration generally. Do NOT trigger for generic monorepo questions unrelated to Turborepo. Do NOT trigger for Nx, Lerna, or other monorepo tools."
 ---
 

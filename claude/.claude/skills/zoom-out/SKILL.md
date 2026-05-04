@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] zoom-out"
+class: workflow
 description: 'Activates on "/zoom-out", "zoom out", or "back to the big picture" — surfacing from a zoomed-in task back to the broader view.'
 triggers:
   - /zoom-out

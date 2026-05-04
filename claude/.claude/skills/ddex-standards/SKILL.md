@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] ddex-standards"
+class: specialist
 description: "Use when the prompt or files in scope mention DDEX or its standard suites — ERN (NewReleaseMessage, DealList, CommercialModelType, UseType), RDR, MWDR, RIN, MEAD — or industry identifiers ISRC / ISWC / IPI / ISNI / GRid / DPID / HFA Song Code / UPC / EAN, or rights and royalty concepts: Manuscript / Writer / Publisher / Collection Share, Right Share, Letter of Direction (LoD), P-Line, C-Line, mechanical license, neighboring rights, sound recording vs musical work rights, equitable remuneration, performer rights, rights controller, royalty registration, distribution metadata standard. Also triggers on DDEX-native flags and code lists: IsCredited, featured / non-featured performer, session musician credit, MWN, MWL, AVS code lists, and on collecting societies (MLC, CISAC, CRO). Authoritative even when the host project has not yet implemented these standards. Do NOT trigger for generic music streaming or playback features unrelated to rights data exchange."
 ---
 

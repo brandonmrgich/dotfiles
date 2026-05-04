@@ -1,5 +1,6 @@
 ---
 name: '[HomebrewSkill] plan-executor'
+class: workflow
 description: Use when the user asks to "execute this plan", "run the plan", "start executing tasks", "orchestrate the master plan", "run all tasks in order", or to "resume the plan" / "continue executing where we left off" / "pick up the plan execution". Activates on a master plan file plus a tasks directory of numbered task files (00-discovery.md, 01-foo.md, …). Do NOT trigger for single-task execution, ad-hoc coding requests, or PR review.
 ---
 

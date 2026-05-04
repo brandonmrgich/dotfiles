@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] gitignore"
+class: specialist
 description: "Activate when editing or auditing a .gitignore, when creating a new tracked path that may need ignoring, or when the user asks 'should this be tracked?', 'what do we ignore?', 'audit the gitignore'. Encodes per-context ignore rules (dotfiles vs project vs monorepo), the canonical .claude/ ignore catalog with justification, and general best practices (env files, build artifacts, OS noise, IDE noise, lockfiles policy)."
 ---
 
