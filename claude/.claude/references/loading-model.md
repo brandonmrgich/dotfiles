@@ -103,12 +103,34 @@ only when explicitly Read by the agent doing the work.
    auto-fetch of the cited file. The agent decides whether to follow
    the pointer.
 
+## Mantras (essay #9 §P3.3 dedup question)
+
+Same model applies to mantras (`~/.claude/mantras/*.md`):
+
+- The **abbreviated form** lives inline in `~/.claude/CLAUDE.md`'s
+  "Design doctrines" section (~1.7 kB). This is **Tier 1** —
+  always-loaded.
+- The **full mantra files** (`~/.claude/mantras/<title>.md`, ~5–6 kB
+  each) are **Tier 3** — only loaded when explicitly Read.
+
+Audit (this session, post-Phase-7): grep across
+`~/.claude/{skills,references,essays,agents}/` for mantra full-path
+citations. **No full-path citations found.** `systematic-debugging`
+SKILL.md cites "make state honest" by *name* (concept reference, not
+path); `references/artifact-classes.md` mentions the mantras directory
+in its class table but does not full-path-cite a specific mantra file.
+
+**No double-load risk; no repointing needed.** The mantras directory
+is a reference repository for the rare case where the full content is
+needed (rationale, history, full failure-mode list); for everyday
+discipline, the abbreviated CLAUDE.md form suffices.
+
 ## Cross-references
 
 - `~/.claude/skills/doc-freshness/SKILL.md` — uses `static: true` to
   flag references that skip staleness checks (because they don't
   cover code paths that change).
-- `~/.claude/essays/skill-system-token-efficiency-audit.md` §P3.2 —
-  the original question this note answers.
+- `~/.claude/essays/skill-system-token-efficiency-audit.md` §P3.2 +
+  §P3.3 — the original questions this note answers.
 - `~/.claude/references/description-format.md` — the rules for
   Tier-1 description authoring.
