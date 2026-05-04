@@ -1,7 +1,7 @@
 ---
 name: "[HomebrewSkill] essay"
 class: capture
-description: "Activates when the user says \"essay this\", \"capture as an essay\", \"save as an essay\", \"open / continue / update the X essay\", \"find essays about Y\", \"what essays touch Z\", \"resolve the X essay\", \"supersede X with Y\", or \"list my essays\". Also activates implicitly when a conversation has produced a non-trivial decision with non-obvious rationale that will affect artifacts (plans, docs, code) and no essay on the topic exists yet — in that case the skill offers capture rather than acting."
+description: "Activates when the user says \"essay this\", \"capture as an essay\", \"save as an essay\", \"open / continue / update the X essay\", \"find essays about Y\", \"what essays touch Z\", \"resolve the X essay\", \"supersede X with Y\", or \"list my essays\". Also activates implicitly when a conversation has produced a non-trivial decision with non-obvious rationale that will affect artifacts (plans, docs, code) and no essay on the topic exists yet — the skill offers capture rather than acting."
 ---
 
 # Essay Skill
