@@ -9,169 +9,108 @@ description: "Use when the prompt or files in scope mention music royalty splits
 Domain reference for royalty split modeling and payout flows. Pairs with
 `ddex-standards` for the messaging side.
 
-## The two royalty streams from a single play
+## Two royalty streams from a single play
 
-Every streamed song generates TWO distinct royalty streams:
+Every streamed song generates TWO distinct streams, separately calculated
+and reported, often by different entities. Conflating them is a common bug.
 
-1. **Sound recording (master) royalty** — paid to the recording owner
-   (label, indie artist via distributor)
-2. **Musical work (publishing) royalty** — paid to songwriters and publishers
-   - **Performance royalty** — for public performance (collected by PROs)
-   - **Mechanical royalty** — for reproduction (collected by MLC in US)
+| Stream | Bucket | Paid to | Sub-types |
+|---|---|---|---|
+| Sound recording | MASTER | Recording owner (label / indie via distributor) | — |
+| Musical work | PUBLISHING | Songwriters + publishers | Performance (PROs), Mechanical (MLC in US) |
 
-These are separately calculated, separately reported, and often paid by
-different entities at different times. Conflating them is a common mistake.
+## Split modeling (MASTER / PUBLISHING bucket pattern)
 
-## Split modeling (the MASTER / PUBLISHING bucket pattern)
+Aligned with DDEX rights types:
 
-The pattern used in indie music platforms (and aligned with DDEX rights
-types):
-
-- Two buckets: `MASTER` and `PUBLISHING`
-- Each bucket sums to 100% per scope
+- Two buckets per scope: `MASTER` and `PUBLISHING`, each summing to 100%
 - Scope is XOR: a split row attaches to EITHER a recording OR a release,
   never both
 
-See `examples/types.example.ts` for the `RoyaltySplit` / `RightsType`
-shape (MASTER/PUBLISHING buckets, XOR `recordingId`/`releaseId`, optional
-ISO-3166 `territory`).
+See `examples/types.example.ts` for `RoyaltySplit` / `RightsType` shape
+(buckets, XOR `recordingId` / `releaseId`, optional ISO-3166 `territory`).
 
 Validation invariants:
 
 - Sum per (scope, rightsType, territory) must equal 100
-- Cannot have splits attached to both `recordingId` and `releaseId` on the
-  same row
-- Re-running validation after delete is required (deletes can leave a bucket
-  at 75%, breaking the invariant)
+- Cannot attach a row to both `recordingId` and `releaseId`
+- Re-validate after delete (deletes can leave a bucket at 75%)
 
 ## Donation-driven payout (typical indie platform model)
 
-Independent music platforms with their own player often run a donation
-flow rather than DSP-style streaming royalties:
+Independent platforms with their own player often run a donation flow
+rather than DSP-style streaming royalties:
 
-```
-Listener tips $X on a track
-  ↓
-Donation row created with releaseId or recordingId
-  ↓
-Worker reads RoyaltySplit rows for that scope
-  ↓
-Allocates donation amount per split percentage
-  ↓
-Creates Payout rows per Person
-  ↓
-Payouts accumulate until threshold; payment processor cuts checks/transfers
-```
+1. Listener tips on a track → Donation row with `releaseId` or `recordingId`
+2. Worker reads `RoyaltySplit` rows for that scope
+3. Allocates donation per split percentage → `Payout` rows per Person
+4. Payouts accumulate to threshold; processor cuts checks/transfers
 
-Key differences from DSP payouts:
-
-- Per-donation allocation, not pro-rata pool
-- Per-track tipping resolution (not aggregated streams)
-- No DSP intermediary — direct creator payment
-- Recoupment less common (artists are typically self-distributed)
+Differences from DSP payouts: per-donation allocation (not pro-rata pool),
+per-track resolution, no DSP intermediary, recoupment rare (artists are
+self-distributed).
 
 ## DSP-style payouts (deferred / future state)
 
-When DSP distribution adapters land (DistroKid, Bandcamp, BMI/ASCAP, etc.),
-additional concepts apply:
+Concepts that apply once DSP distribution adapters land (DistroKid,
+Bandcamp, BMI/ASCAP, etc.):
 
-### Recoupment
-
-When advances are paid, future royalties offset before payout:
-
-- Cross-collateralized: advance recouped from any release's earnings
-- Single-release: advance only recouped from that release
-- Retail vs wholesale recoupment: massive practical difference
-- Unrecouped balance carries indefinitely
-
-### Withholding
-
-- Tax: W-9 (US) vs W-8BEN (foreign); 30% default without W-8BEN
-- Refunds/chargebacks: 60-90 day reserve typical
-- Recoupment offsets
-- Disputed claims (overlapping ContentID, etc.)
-
-### Currency conversion
-
-- DSPs report in their currency (USD, EUR, GBP)
-- Distributor converts at rate prevailing on a specific date
-- Always store: original currency + converted currency + rate + rate date
-
-### Accounting periods
-
-- DSPs typically report monthly with 60-90 day lag
-- Split rules apply to the **streaming period**, NOT the **payout period**
-- If splits change in March, March streams use new splits even if paid in May
-
-### Per-stream rates: there is no single rate
-
-Real rates vary by:
-
-- DSP (Spotify ~$0.003-0.005, Apple ~$0.007-0.01, YouTube ~$0.001-0.002)
-- Subscriber tier (premium / free / family / student)
-- Country (US/UK/EU >> emerging markets)
-- Time of month (DSP revenue and total stream volume fluctuate)
-- Free trial vs paid
-
-DSPs use "pro-rata pool": total subscription revenue × (this song's share of
-total streams). NOT a fixed rate × streams.
+- **Recoupment** — advances offset future royalties. Cross-collateralized
+  vs single-release; retail vs wholesale recoupment; unrecouped balance
+  carries indefinitely.
+- **Withholding** — W-9 (US) vs W-8BEN (foreign, 30% default without);
+  60-90 day chargeback reserve; recoupment offsets; disputed-claims hold.
+- **Currency conversion** — DSPs report in their currency; converted at a
+  specific date's rate. Always store original + converted + rate + rate date.
+- **Accounting periods** — DSPs report monthly with 60-90 day lag. Splits
+  apply to the **streaming period**, NOT the **payout period**.
+- **No single per-stream rate** — varies by DSP, subscriber tier, country,
+  time of month, free vs paid. DSPs use pro-rata pool: total subscription
+  revenue × (this song's share of total streams), NOT fixed-rate × streams.
 
 ## Mechanical royalties (US specifics)
 
-- **Statutory rate** set by Copyright Royalty Board (CRB) every 5 years
-- **MLC (Mechanical Licensing Collective)** administers blanket mechanical
-  licenses for streaming since MMA 2018
-- **Phonorecords IV** ruling: streaming mechanical rate increases through 2027
-- **Black box** royalties: unmatched mechanicals held by MLC, distributed
-  by market share if unclaimed after holding period
-- **HFA (Harry Fox Agency)**: historical mechanical collector; still active
-  for some catalogs
+- **Statutory rate** — set by Copyright Royalty Board (CRB) every 5 years
+- **MLC** — administers blanket mechanical licenses for streaming since
+  MMA 2018; **Phonorecords IV** ruling raises streaming mechanical through 2027
+- **Black box** — unmatched mechanicals held by MLC, distributed by market
+  share if unclaimed
+- **HFA** — historical mechanical collector; still active for some catalogs
 
-## Neighboring rights (sound recordings only)
+## Neighboring rights & performer payment
 
-- Performance royalties for terrestrial radio in many countries
-  (NOT US for non-digital broadcasts)
-- US: SoundExchange handles digital performance royalties from
-  satellite/internet radio
-- Equitable remuneration: 50% to label, 50% to performers
-  (featured + non-featured)
-- Featured artist split typically negotiated; default 45/45/10
-  (label / featured / non-featured pool) varies by country
+Sound-recording-only performance royalties (terrestrial radio in many
+countries — NOT US for non-digital broadcasts; SoundExchange handles US
+digital satellite/internet performance).
 
-## Featured vs non-featured performer distinction
+- **Equitable remuneration** — 50% label / 50% performers (default 45/45/10
+  label / featured / non-featured pool; varies by country)
+- **Featured performer** — primary or named-featured artist; larger share
+- **Non-featured (session) musician** — backing; pool share, much smaller
+- **`IsCredited` flag** — credited (public credit + payment) vs uncredited
+  (payment only)
 
-Critical for neighboring rights and some streaming royalty splits:
-
-- **Featured performer** — primary artist or named featured artist on the
-  release; receives larger share
-- **Non-featured (session) musician** — backing musician; receives share
-  from a pool, typically much smaller
-- **`IsCredited` flag** — distinguishes credited (public credit + payment)
-  from uncredited (payment only)
-
-The MASTER bucket modeling pattern handles this by including both featured
-and session performers in the bucket with appropriate percentages.
+The MASTER bucket pattern handles this: featured + session performers
+share the bucket with appropriate percentages.
 
 ## Common implementation pitfalls
 
-1. **Storing only net revenue** — always store gross + deductions for audit
-2. **Mutating split rules in place** — splits should be VERSIONED, never
-   updated; historical periods need historical splits
-3. **Floating-point currency** — always integer cents (or arbitrary-precision
-   decimals)
-4. **Single-currency models** — multi-currency from day one is much cheaper
-   than retrofitting
-5. **Skipping reserve handling** — chargebacks happen; need reserve mechanism
-6. **Missing audit trail** — every payout calculation must be reproducible
-   from source data
-7. **Confusing payout date with earning date** — splits, taxes, recoupment
-   depend on when streams happened, not when they paid out
-8. **Treating mechanical and performance as one** — different rates,
-   different collectors, different reporting cadences
-9. **Sum validation only on create/update, not delete** — deleting a split
-   row can leave a bucket at 75%; bulk replace is cleaner than per-row
-10. **Currency conversion at payout date instead of streaming date** —
-    introduces FX risk that should belong to the platform, not the artist
+1. Storing only net revenue — keep gross + deductions for audit
+2. Mutating split rules in place — splits must be VERSIONED; historical
+   periods need historical splits
+3. Floating-point currency — use integer cents or arbitrary-precision decimals
+4. Single-currency models — multi-currency from day one is far cheaper than
+   retrofitting
+5. Skipping reserve handling — chargebacks happen
+6. Missing audit trail — every payout must be reproducible from source data
+7. Confusing payout date with earning date — splits, taxes, recoupment
+   depend on when streams happened
+8. Treating mechanical and performance as one — different rates, collectors,
+   cadences
+9. Sum validation only on create/update, not delete — bulk replace is cleaner
+   than per-row
+10. Currency conversion at payout date — FX risk should belong to the
+    platform, not the artist
 
 ## Recommended split mutation pattern
 
@@ -182,15 +121,12 @@ PUT /royalty-splits?scope=recording&id=<id>&rightsType=MASTER
 body: { splits: [...] }   // entire bucket, replaces atomically
 ```
 
-This avoids the partial-state problem during build-up:
-
-- Without bulk replace: first row "create 50%" fails (sum != 100)
-- With bulk replace: send all rows together, validate together, commit together
+Avoids the partial-state problem: per-row "create 50%" fails sum != 100;
+bulk replace validates and commits all rows together.
 
 ## When to consult `ddex-standards` instead
 
 DDEX message construction (RDR-R revenue reports, MWN ownership queries),
-ISRC/ISWC linking, IPI/ISNI usage, neighboring rights protocol details.
-
-This skill covers the business logic side (calculation, allocation, payout
-flow). DDEX covers the messaging side.
+ISRC/ISWC linking, IPI/ISNI usage, neighboring-rights protocol details.
+This skill is the business-logic side (calculation, allocation, payout
+flow); DDEX is the messaging side.
