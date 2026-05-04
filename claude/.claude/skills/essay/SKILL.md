@@ -6,50 +6,20 @@ description: "Activates when the user says \"essay this\", \"capture as an essay
 
 # Essay Skill
 
-Captures the reasoning behind design decisions in a durable form. Essays sit between
-chat history (ephemeral) and docs (describe current state) — they record *why* things
-are the way they are.
+Captures *why* behind design decisions — between chat (ephemeral) and docs (current state). A compressed log of *train of thought*, not verbatim chat.
 
----
+**Capture:** decision (1 sentence), options considered (1 line + tradeoff each), rationale (1–3 sentences), anchors (artifacts produced/affected).
 
-## What an essay is
-
-A compressed log of decisions and rationale. Essays preserve the *train of thought*,
-not verbatim conversation.
-
-A good essay entry captures:
-- **What was being decided** (one sentence)
-- **Options considered** (terse — 1 line each, with key tradeoff)
-- **Decision** (one sentence)
-- **Rationale** (1–3 sentences — the *why*)
-- **Anchors** (artifacts produced or affected)
-
-A good essay entry does NOT capture:
-- Verbatim conversation
-- Side discussions that didn't lead to decisions
-- Rejected brainstorming (unless rejection itself is the lesson)
-- Implementation detail (that lives in plans/docs)
+**Don't capture:** verbatim chat, side discussions, rejected brainstorming (unless rejection is the lesson), implementation detail (lives in plans/docs).
 
 ---
 
 ## Storage
 
-- **User-wide:** `~/.claude/essays/<slug>.md` (default)
-- **Project-local:** `<repo>/.claude/essays/<slug>.md` (rare exception)
+- **User-wide (default):** `~/.claude/essays/<slug>.md` — reasoning is portable.
+- **Project-local (rare):** `<repo>/.claude/essays/<slug>.md` — only when reasoning is meaningless outside the repo.
 
-**Default is user-wide.** Essays capture reasoning — reasoning is portable. The essay
-lives in `~/.claude/essays/` regardless of which project prompted the thinking.
-
-The plan or doc produced by an essay is what attaches to the project. When an essay
-produces a plan, the plan goes in `<repo>/.claude/plans/<plan-name>/` and its
-MasterPlan.md carries `from-essay: <essay-slug>` in its front-matter. This is how the
-essay-to-project connection is made — through the artifact, not the essay's location.
-
-**Exception — project-local essays:** only when the essay describes reasoning that is
-genuinely specific to one repo's internals and would be meaningless outside it (e.g.,
-a migration decision tied to a specific schema). When in doubt, default user-wide and ask.
-
-The slug is kebab-case derived from the essay title.
+Slug: kebab-case from title. Project linkage flows through the produced artifact (see Anchoring), not location.
 
 ---
 
@@ -63,11 +33,9 @@ created: <ISO date>
 last-active: <ISO date>
 tags: [tag1, tag2]
 anchors:
-  produced:
-    - <path to plan, doc, or code area>
-  references:
-    - <other essay slug>
-  superseded-by: <essay slug>  # only when status is superseded
+  produced: [<path to plan/doc/code>]
+  references: [<other essay slug>]
+  superseded-by: <essay slug>  # only when status: superseded
 ---
 ```
 
@@ -75,157 +43,58 @@ anchors:
 
 ## Operating modes
 
-### Snapshot mode
-
-Triggers: "essay this", "capture as an essay", "save this conversation as an essay"
-
-1. Identify the decisions made in the conversation (filter for actual decisions, not info exchange)
-2. Determine routing: user-wide or project-local based on anchors
-3. Propose a slug and front-matter
-4. Draft the essay body in compressed-log format
-5. Show the draft to the user
-6. After approval, write the file
-
-The essay is "frozen" after snapshot. Further conversation does not auto-update it.
-
-### Living mode
-
-Triggers: "open the X essay", "continue the X essay"
-
-1. Locate and read the essay (search `~/.claude/essays/` first, then project-local)
-2. Treat it as conversation context
-3. The user explicitly says "update the essay" to write changes
-4. If after snapshot the conversation produces NEW decisions, prompt:
-   "This conversation produced new decisions since the essay was snapshotted. Want me to update it?"
-
-### Update mode
-
-Triggers: "update the X essay"
-
-1. Read existing essay
-2. Identify NEW decisions or refinements since last update
-3. Append a new dated section (don't rewrite history)
-4. Update `last-active`
-5. Update `anchors.produced` if new artifacts were created
-6. Show diff, confirm, write
-
-### Resolve mode
-
-Triggers: "resolve the X essay"
-
-1. Read essay
-2. Confirm all `anchors.produced` exist (the artifacts were actually created)
-3. **Anchor-chain nudge.** If `anchors.produced` is missing or `[]`,
-   surface (soft warning, not a block):
-   `"Essay being resolved without anchored produced artifacts. Confirm: was this essay informational only, or did it produce a plan/doc that should be linked?"`
-   User confirms or pauses to update `anchors.produced`.
-4. Set `status: resolved`
-5. Optionally add a "Resolution" section summarizing final outcomes
-6. Write
-
-Resolved is NOT immutable — can be reopened or superseded.
-
-### Supersede mode
-
-Triggers: "supersede X with Y"
-
-1. If Y doesn't exist, create it via snapshot mode first
-2. Update X's front-matter: `status: superseded`, `superseded-by: <Y-slug>`
-3. Add a one-line note at the top of X: "Superseded by [Y title] (<date>)"
-
-### Query mode
-
-Triggers: "find essays about Y", "what essays touch Z", "list my essays"
-
-1. Search across `~/.claude/essays/` and any project-local `<repo>/.claude/essays/` in scope
-2. Match by tags, content, or anchors
-3. Return as a table: `| Title | Status | Last active | Anchors | Tags |`
-
-### Archive mode
-
-Triggers: explicit "archive the X essay" OR "show me old essays" with periodic cleanup
-
-1. List essays older than 6 months (by `last-active`)
-2. For each, ask if it should be archived
-3. On confirmation: move to `archive/`, update `status: archived`
+| Mode | Trigger | Action |
+|---|---|---|
+| Snapshot | "essay this", "capture as an essay" | Identify decisions; route user-wide/project-local; propose slug + front-matter; draft; show; on approval, write. Frozen after. |
+| Living | "open / continue the X essay" | Locate; treat as context. Write only on explicit "update". If new decisions emerge, prompt. |
+| Update | "update the X essay" | Identify NEW decisions; append dated section (don't rewrite); bump `last-active`; update `anchors.produced` if needed; show diff; write. |
+| Resolve | "resolve the X essay" | Confirm `anchors.produced` exist. **Anchor-chain nudge:** if missing/`[]`, soft-warn (don't block): *"Resolving without `anchors.produced`. Informational, or should a plan/doc be linked?"* Set `status: resolved`. Not immutable. |
+| Supersede | "supersede X with Y" | Snapshot Y first if absent. Set X `status: superseded`, `superseded-by: <Y-slug>`; prepend "Superseded by [Y] (<date>)". |
+| Query | "find essays about Y", "list my essays" | Search `~/.claude/essays/` + in-scope `<repo>/.claude/essays/`. Match tags/content/anchors. Return `\| Title \| Status \| Last active \| Anchors \| Tags \|`. |
+| Archive | "archive the X essay" | List essays older than 6 months by `last-active`; ask per essay; on confirm move to `archive/`, set `status: archived`. |
 
 ---
 
 ## Implicit triggering
 
-When a conversation might warrant an essay, ALL of these must be true to proactively offer:
+Proactively offer ONLY when ALL hold: (1) decision reached (not Q&A), (2) rationale wasn't obvious, (3) decision will produce/affect artifacts, (4) no existing essay covers it.
 
-1. The conversation reached at least one decision (not just Q&A)
-2. The decision has rationale that wasn't obvious upfront
-3. The decision is likely to produce or affect artifacts
-4. No essay on this topic already exists (or the existing one is meaningfully extended)
+Append: "Decision about [topic] with non-obvious rationale. Capture as essay? [user-wide / project-local], anchors: [artifacts]."
 
-When all four hold, at the end of your normal response, add:
-
-```
----
-**Essay capture suggestion:** This conversation produced a decision about [topic] with
-non-obvious rationale. Want me to capture this as an essay? It would be [user-wide /
-project-local] and anchor to [artifacts]. Estimated content: [brief summary].
-```
-
-If user declines or ignores, do NOT re-prompt.
-
-DO NOT offer an essay when:
-- Conversation was Q&A only
-- Decision was trivial / obvious
-- Conversation was task execution (running migrations, debugging)
-- Already essayed and not meaningfully extended
+If declined or ignored, do NOT re-prompt. Don't offer for Q&A, trivial decisions, task execution, or already-essayed topics.
 
 ---
 
-## Integration with anchoring
+## Anchoring
 
-**Essay → plan → project** is the canonical flow:
+Canonical chain: **essay → plan → project**. Plan goes in `<repo>/.claude/plans/<plan-name>/`; its MasterPlan carries `from-essay: <slug>`; essay's `anchors.produced` lists the plan. Doc-direct (rare): doc gets `from-essay:`; essay's `anchors.produced` lists the doc.
 
-1. Reasoning lives in the essay (user-wide, portable)
-2. When the essay produces a plan, the plan goes in `<repo>/.claude/plans/<plan-name>/`
-3. The plan's MasterPlan.md carries `from-essay: <essay-slug>` in front-matter
-4. The essay's `anchors.produced` lists the plan path
-5. This is how essays attach to projects — through the plan artifact, not the essay's location
+Cross-essay: newer's `anchors.references` lists older slug. Older does NOT update (one-way, no cascades).
 
-When an essay produces a doc directly (rare):
-1. The doc gets `from-essay: <essay-slug>` in its front-matter
-2. The essay's `anchors.produced` lists the doc path
+### `ready-for-plan` tag
 
-When essays reference each other:
-1. The newer essay's `anchors.references` lists the older essay slug
-2. The older essay does NOT need updating (one-way to avoid cascades)
+When design has settled but no plan/code exists, add `ready-for-plan` to `tags`. Marks a planning candidate without bending the taxonomy: `resolved` requires artifacts produced, so without a plan, `status` stays `open` and the tag carries readiness.
 
-### The `ready-for-plan` tag
+Query mode matches "essays tagged ready-for-plan" (and phrasings about planning queue / candidates / awaiting a plan).
 
-When an essay's design decisions have settled but no plan or code yet exists, add `ready-for-plan` to its front-matter `tags`. This marks the essay as a planning candidate without bending the status taxonomy — `resolved` requires artifacts produced, and the plan is not yet produced, so the essay's `status` stays `open` while the tag carries the readiness signal.
-
-Discovery: query mode matches the tag. `find essays tagged ready-for-plan` (or any phrasing about the planning queue, planning candidates, queued essays, essays awaiting a plan) surfaces every tagged essay across `~/.claude/essays/` and any in-scope project-local essay tree.
-
-When a plan is actually created from the essay:
-1. Remove `ready-for-plan` from `tags`.
-2. Add the plan path to the essay's `anchors.produced`.
-3. Consider whether `status` should advance to `resolved`.
-
-Plan creation from a tagged essay is always a deliberate, separate invocation — never auto-create plans from tagged essays.
+On plan creation: remove the tag, add the plan to `anchors.produced`, consider advancing `status` to `resolved`. Always deliberate — never auto-create.
 
 ---
 
 ## Writing principles
 
-- **Compress.** A 90-minute conversation with three decisions is ~150 lines, not 9000.
-- **Train of thought matters.** Capture *why options were rejected*, not just what was chosen.
-- **Anchors first.** Draft the anchors before drafting the body. This grounds the essay.
-- **Reasoning > narration.** "We chose X because Y, accepting tradeoff Z" beats narrative.
+- **Compress.** 90 minutes, 3 decisions = ~150 lines, not 9000.
+- **Capture *why options were rejected***, not just the choice.
+- **Anchors first.** Draft anchors before body.
+- "Chose X because Y, accepting Z" beats narrative.
 
 ---
 
 ## What you must never do
 
-- Auto-write essays without user confirmation
-- Capture verbatim chat as essay content
-- Update an essay without showing the diff
-- Re-prompt after a user has declined an essay capture
-- Create both a user-wide and project-local essay for the same topic
-- Modify an essay's `created` date
+- Auto-write without confirmation
+- Capture verbatim chat
+- Update without showing the diff
+- Re-prompt after a decline
+- Create both user-wide and project-local for the same topic
+- Modify `created`
