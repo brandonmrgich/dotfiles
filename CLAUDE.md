@@ -8,7 +8,7 @@ This is a GNU Stow-managed dotfiles repo. Each top-level directory is a **stow p
 dotfiles/
   claude/          → stow package → ~/.claude/
   git/             → stow package → ~/
-  starship/        → stow package → ~/
+  starship/        → stow package → ~/.config/starship.toml
   tmux/            → stow package → ~/.config/tmux/
   zsh/             → stow package → ~/
 ```

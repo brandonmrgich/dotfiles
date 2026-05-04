@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 # ~/.claude/statusline-command.sh
+#
+# STATUS: DISABLED in settings.json — leave disabled until validated.
+# History: an earlier, heavier version of this script (directory + git porcelain
+# + ahead/behind on every tick) periodically pegged a core hard enough to kill
+# the parent claude process. That version was slimmed (this file) to ctx + rate
+# limits only, which should be cheap, but the disable hasn't been lifted because
+# the regression was never reproduced and tied to a specific cause.
+# Before re-enabling: run it under load (long session, large repo) and confirm
+# CPU stays flat. If it spikes, suspect the unconditional jq+eval bootstrap on
+# every tick — easy fixes are caching the parsed values for ~2s or wrapping in
+# `timeout 0.5s`.
 
 BOLD_GREEN="\033[1;32m"
 BOLD_YELLOW="\033[1;33m"

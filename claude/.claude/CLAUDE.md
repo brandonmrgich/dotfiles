@@ -207,3 +207,9 @@ host + Pi DNS + AWS prod + Oracle standby). The `environment-map`
 skill loads the full topology on demand. Activate it on host names,
 service names, or cross-machine queries. See
 `~/.claude/environment/` for the source files.
+
+---
+
+## Pull requests
+
+Every PR must have a non-empty summary in its body explaining *what changed and why*. Default to concise: a few bullets plus a Test-plan checklist (the `gh pr create` template). Scale up only when the diff is genuinely nontrivial — multiple concerns, behavior changes, operator-impacting choices — in which case a per-commit breakdown and an "Operator notes" section earn their keep. Empty bodies and generic titles ("Update X") are not acceptable.

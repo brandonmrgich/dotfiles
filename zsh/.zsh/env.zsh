@@ -2,6 +2,9 @@
 # env.zsh — PATH, Homebrew, exports
 # Sourced FIRST, before oh-my-zsh
 
+# User-local binaries (XDG convention) — nvim AppImage, starship, fd shim, etc.
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
 # Homebrew (Apple Silicon)
 if [[ -x /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"

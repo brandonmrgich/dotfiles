@@ -32,5 +32,10 @@ source ~/.zsh/tmux.zsh
 # --- Starship prompt ---
 eval "$(starship init zsh)"
 
+# --- NVM (no-op if not installed) ---
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
 # --- Optional local overrides (not tracked in dotfiles) ---
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
