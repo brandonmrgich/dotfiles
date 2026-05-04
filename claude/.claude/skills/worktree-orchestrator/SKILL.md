@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] worktree-orchestrator"
+class: workflow
 description: "Use when the user says 'start a worktree for', 'create a worktree', 'list active worktrees', 'merge the worktree for', 'switch to worktree', 'prepare worktree merge', or 'clean up worktree'. Also activates when plan-executor is starting a non-trivial plan (>5 tasks) and no worktree exists for it yet. Covers concurrent agent work on long-running plans, the registry at ~/.claude/worktree-registry.json, conflict detection, merge preparation (NEVER auto-merge), and post-merge cleanup."
 triggers:
   - "start a worktree"

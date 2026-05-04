@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] idea-tracker"
+class: capture
 description: "Use when the user says \"save as idea\", \"track this idea\", \"remember this for later\", \"park this for now\", \"we should eventually X\", \"shelve this idea\", \"promote this idea\", or asks \"what ideas do I have\" / \"list my ideas\". Also activates when conversation surfaces a future direction worth preserving but not actioning now."
 triggers:
   - "save as idea"

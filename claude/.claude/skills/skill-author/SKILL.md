@@ -1,5 +1,6 @@
 ---
 name: skill-author
+class: meta
 description: Use when the user explicitly asks to create, capture, or save a skill, agent, sub-agent, or workflow. Triggers include "create a skill for this", "save this as a skill", "make this an agent", "turn this into a skill", "capture this pattern", "add a skill", "write a skill for X". Also activates implicitly when the session shows multi-doc research, niche concept exploration, repeated context-gathering, or substantial domain-specific work that produced a distinct repeatable pattern. Do NOT trigger for trivial requests, single-question Q&A, or any prompt where the user is clearly asking for an immediate task to be completed (only when the user is explicitly authoring/capturing a skill or when the meta-pattern of "this work could become a skill" applies).
 ---
 

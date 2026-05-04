@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] environment-map"
+class: capture
 description: >
   Use when prompts mention specific hosts (m1-macbook, debian-macbook,
   macbook-intel-2012-debian, DietPi, pi, instance-20230401-new,

@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] systematic-debugging"
+class: discipline
 description: "Use when debugging, investigating bugs, chasing failures, diagnosing intermittent issues, or chasing 'sometimes-broken' behavior. Activates on phrases like 'why is this failing', 'I'm trying to debug', 'flaky test', 'sometimes broken', 'intermittent', 'race condition', 'heisenbug', 'works on my machine', 'users are seeing X but I see Y'. Enforces a 4-phase root-cause methodology (REPRODUCE → ISOLATE → DIAGNOSE → FIX) with iron-law: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST. Halts after 3 failed attempts to question architecture. Do NOT trigger for simple typo fixes, syntax errors, or compile errors with obvious cause."
 ---
 

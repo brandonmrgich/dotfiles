@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] requesting-code-review"
+class: ritual
 description: "Use when asking for code review, marking a PR ready for review, requesting feedback, or dispatching the code-reviewer sub-agent. Activates on phrases like 'request review', 'ready for review', 'PTAL', 'can you review', 'review my changes'. Enforces a 5-item pre-request checklist: reviewable diff, intent stated, test plan concrete, concerns flagged, self-review complete. Cross-references the pr-review-toolkit:code-reviewer agent for auto-review, and sibling receiving-code-review for response discipline. Do NOT trigger for draft-PR / WIP signals or for requests to a specific human reviewer outside the skill scope."
 ---
 

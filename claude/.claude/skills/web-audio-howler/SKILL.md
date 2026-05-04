@@ -1,5 +1,6 @@
 ---
 name: web-audio-howler
+class: specialist
 description: "Use when the prompt or files in scope reference Howler.js (Howler, howler.js, Howl, html5:true / html5:false), the Web Audio API (AudioContext, MediaElementAudioSourceNode, createMediaElementSource, AnalyserNode), or the MediaSession API (navigator.mediaSession, mediaSession.metadata, mediaSession.setPositionState, MediaMetadata, play/pause/seekto/seekbackward/seekforward action handlers). Also triggers on audio playback, audio visualizer / analyzer / waveform, audio engine, lock screen audio, hardware media keys, OS audio integration, the dual-path Howler+Web-Audio architecture, the createMediaElementSource one-per-element constraint with WeakMap caching, AudioContext priming on user gesture, identity-vs-position effect split for MediaSession ownership hooks, and cross-app / cross-tab playback ownership via BroadcastChannel. Do NOT trigger for generic audio file format questions unrelated to playback."
 ---
 

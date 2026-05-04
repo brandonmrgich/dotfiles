@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] finishing-a-branch"
+class: ritual
 description: "Use when finishing a feature branch, marking work ready to merge, closing out ad-hoc branch work, or asking 'what's left before merging'. Activates on phrases like 'ready to merge', 'finishing this branch', 'close out the work', 'what's left', 'wrapping up'. Pre-flight check: if a plan is active, defer to plan-executor Phase 4. Else runs a 7-item closeout checklist (tests, clean diff, logical commits, TODOs addressed, sidecars updated, stow synced, tag bump considered). Cross-refs plan-executor, worktree-orchestrator, github, verification-before-completion. Do NOT trigger for in-progress check-ins or draft branches."
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] test-driven-development"
+class: discipline
 description: "Use when adding a feature, fixing a bug with a known reproduction, refactoring with behavior-preserving intent, or changing observable production behavior. Activates on phrases like 'add this function', 'implement X', 'fix this bug', 'let me write the implementation', 'I'll add tests after'. Enforces iron-law: NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST. Full cycle RED -> verify-RED -> GREEN -> verify-GREEN -> REFACTOR. Pre-test production code must be deleted and re-derived test-first. Do NOT trigger for typo fixes, comment-only changes, dependency bumps, or pure documentation."
 ---
 

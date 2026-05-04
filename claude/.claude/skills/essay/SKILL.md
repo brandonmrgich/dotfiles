@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] essay"
+class: capture
 description: "Activates when the user says \"essay this\", \"capture as an essay\", \"save as an essay\", \"open / continue / update the X essay\", \"find essays about Y\", \"what essays touch Z\", \"resolve the X essay\", \"supersede X with Y\", or \"list my essays\". Also activates implicitly when a conversation has produced a non-trivial decision with non-obvious rationale that will affect artifacts (plans, docs, code) and no essay on the topic exists yet — in that case the skill offers capture rather than acting."
 ---
 
@@ -114,9 +115,13 @@ Triggers: "resolve the X essay"
 
 1. Read essay
 2. Confirm all `anchors.produced` exist (the artifacts were actually created)
-3. Set `status: resolved`
-4. Optionally add a "Resolution" section summarizing final outcomes
-5. Write
+3. **Anchor-chain nudge.** If `anchors.produced` is missing or `[]`,
+   surface (soft warning, not a block):
+   `"Essay being resolved without anchored produced artifacts. Confirm: was this essay informational only, or did it produce a plan/doc that should be linked?"`
+   User confirms or pauses to update `anchors.produced`.
+4. Set `status: resolved`
+5. Optionally add a "Resolution" section summarizing final outcomes
+6. Write
 
 Resolved is NOT immutable — can be reopened or superseded.
 

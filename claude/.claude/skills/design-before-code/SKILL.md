@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] design-before-code"
+class: discipline
 description: "Use when about to implement a feature, fix, or change without first stating goal + alternatives + trade-offs. Activates on phrases like 'let me just build it', 'I'll start coding', 'skip the planning', 'this is simple', 'should be quick', 'this is straightforward', 'no need to overthink'. Enforces iron-law: NO CODE BEFORE DESIGN. EVEN ON SIMPLE TASKS. 5-step procedure: state goal, diverge (2-3 approaches), converge (pick + tradeoffs), capture (graduate to essay or idea), implement. Do NOT trigger for typo fixes, comment-only changes, dependency bumps, or applying a previously-decided design."
 ---
 

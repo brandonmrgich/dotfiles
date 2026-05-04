@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] top-down-sweep"
+class: workflow
 description: "Activates on '/top-down-sweep', 'top-down sweep from <path>', 'audit docs from <path>', or 'sweep docs'. Use when the user asks for a breadth-first documentation audit from a named root doc (README.md, ARCHITECTURE.md, BRIDGES.md, or similar canonical doc)."
 triggers:
   - /top-down-sweep

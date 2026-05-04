@@ -118,3 +118,22 @@ In `.claude/plan-states/<plan-name>.json`, set
 flag is what enables the orchestrator's Phase 5 cleanup to safely
 remove generated files. Without this flag, Phase 5 will treat all
 files as user-authored and decline to remove them.
+
+---
+
+## Task-quality rationalizations
+
+The universal excuses for shipping vague tasks — and why each fails:
+
+- "The implementer will figure out the details." → No: tasks must
+  state what to do, not delegate scope.
+- "It's obvious what this means in context." → Pass the zero-context
+  engineer test. If a fresh sub-agent can't tell, it isn't.
+- "I'll add specifics later." → Later is now or never.
+- "Each task is just one chunk of work." → Tasks are 2–5 minutes of
+  work each, not whole features.
+- "Placeholders are fine for early drafts." → Tasks ship; drafts
+  don't. Keep placeholders in essays, not task files.
+
+See `~/.claude/skills/plan-executor/SKILL.md` Phase 1 task-quality
+gate for the dispatch-side enforcement.

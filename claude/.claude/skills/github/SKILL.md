@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] github"
+class: specialist
 description: "Activate when pushing, opening a PR, merging, tagging, releasing, or hitting permission/auth issues during git operations. Also activate when working in a non-interactive context (plan-executor, worktree-orchestrator, scheduled agents) where a PIN/passphrase prompt would hang the session. Encodes commit message standards, PR body templates, tag/release conventions per repo type, push/force-push/--no-verify policies, and pre-flight auth checklists."
 ---
 

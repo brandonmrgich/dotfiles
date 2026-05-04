@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] royalty-splits-music"
+class: specialist
 description: "Use when the prompt or files in scope mention music royalty splits or payouts: royalty split, RoyaltySplit, split sheet, MASTER vs PUBLISHING bucket, sum-to-100 invariants, recording-vs-release scope (XOR), payout, donation payout, recoupment, advance, withholding, mechanical royalty, performance royalty, neighboring rights, equitable remuneration, ContentID revenue, songwriter / publisher / writer / master / collaborator share, RightsOwnership, royalty allocation, or paths under /payouts/, /splits/, /royalties/, /donations/. Also covers the sound-recording vs musical-work (publishing) split, 50/50 label-vs-performers neighboring-rights split, featured vs non-featured performer payment, and the deferred-payout state typical of indie platforms before distributor payout adapters land. Do NOT trigger for generic financial accounting or unrelated music metadata."
 ---
 

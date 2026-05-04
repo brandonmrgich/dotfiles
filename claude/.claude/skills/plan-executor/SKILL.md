@@ -1,5 +1,6 @@
 ---
 name: '[HomebrewSkill] plan-executor'
+class: workflow
 description: Use when the user asks to "execute this plan", "run the plan", "start executing tasks", "orchestrate the master plan", "run all tasks in order", or to "resume the plan" / "continue executing where we left off" / "pick up the plan execution". Activates on a master plan file plus a tasks directory of numbered task files (00-discovery.md, 01-foo.md, …). Do NOT trigger for single-task execution, ad-hoc coding requests, or PR review.
 ---
 
@@ -91,6 +92,13 @@ active plan and ask whether to run concurrently or pause the other.
 3. If absent: gather inputs, parse the tasks directory, build the
    task list from filename ordering (00-, 01-, 02a-, 02b-, etc.),
    and write the initial state file.
+4. **Anchor-chain check (initialize only, not resume).** Read the master
+   plan front-matter. Soft warnings — display, accept Y/N or
+   implicit-continue, do NOT block:
+   - `from-essay:` missing/empty → surface
+     `"No essay anchored to this plan. Intentional? (Y to continue, N to revisit and add from-essay:.)"`
+   - `affects-docs:` missing/empty AND task count >5 → surface
+     `"No affects-docs: declared. If this plan touches doc-bearing code paths, declare them now for downstream verification."`
 
 ### Phase 1 — Validate the plan
 
@@ -98,9 +106,14 @@ active plan and ask whether to run concurrently or pause the other.
 2. Read every task file in the tasks directory.
 3. Confirm each task file declares: Context, Prerequisites, Scope,
    Out of Scope, Acceptance Criteria, Validation Steps, Deliverables.
-4. Build the prerequisite graph from declared prerequisites in each
+4. **Task-quality gate.** Each task must have CONCRETE steps — no
+   "figure out", "as appropriate", "TBD", or open-ended verbs.
+   Failing tasks get marked `needs-elaboration` and surfaced before
+   dispatch. Sub-agents enforce the same gate and may return
+   `REJECTED` (handled in Phase 2).
+5. Build the prerequisite graph from declared prerequisites in each
    task file. If a cycle exists, halt and report.
-5. Confirm the next task to run has all prerequisites marked complete.
+6. Confirm the next task to run has all prerequisites marked complete.
 
 ### Phase 2 — Dispatch the next task
 
@@ -131,6 +144,10 @@ For each task in order:
 
 5. Parse the return summary. Record in state file: outcome, commit
    SHA (if any), short summary, completion timestamp.
+
+6. **REJECTED handling.** On `Verdict: REJECTED`, surface reason +
+   suggested elaboration to the user. No auto-retry. User picks:
+   (a) elaborate and re-dispatch, (b) skip, (c) abort.
 
 ### Phase 3 — Decide next action
 

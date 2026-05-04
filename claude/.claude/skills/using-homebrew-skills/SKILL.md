@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] using-homebrew-skills"
+class: ritual
 description: "Use before responding to any user prompt. Activates on every first response in a session and on phrases like 'scan skills', 'what skills do I have', 'list my skills', 'before responding'. Enforces iron-law: BEFORE RESPONDING, SCAN LOADED SKILLS. IF ANY PLAUSIBLY APPLY, INVOKE — even before asking clarifying questions. Rationalization table covers 'simple case', 'quick response', 'I already know this', 'mid-conversation' excuses. Do NOT trigger for tool-output-only responses or for explicit user direction to skip skill invocation."
 ---
 

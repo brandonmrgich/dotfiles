@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] session-ready"
+class: workflow
 description: "Activates on '/session-ready', 'is this session ready', 'fresh claude check', 'before closing', 'can a new session pick this up', or when the user is about to close a session at end of day, hand work to a different session, or suspects the docs no longer carry enough context. Target may be a current task, plan, essay, or working state."
 triggers:
   - /session-ready

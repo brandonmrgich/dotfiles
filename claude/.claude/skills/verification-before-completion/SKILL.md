@@ -1,5 +1,6 @@
 ---
 name: "[HomebrewSkill] verification-before-completion"
+class: discipline
 description: "Use when claiming a task is done, marking complete, declaring a fix shipped, closing a PR, or signaling 'this is ready'. Activates on phrases like 'I'm done', 'task complete', 'fixed it', 'ready to merge', 'should be working', 'I think it's done'. Enforces iron-law: DO NOT CLAIM DONE WITHOUT FRESH EVIDENCE. Required evidence per artifact: code = test output + diff cite + behavioral check; docs = re-read + last-verified cite; plans = audit verdict. Bans hedging language. Do NOT trigger for in-progress status updates or partial-work check-ins."
 ---
 
