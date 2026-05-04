@@ -1,6 +1,6 @@
 ---
 plan: skills-trim-followups
-status: ready
+status: completed
 from-essay:
   - ~/.claude/essays/skill-system-token-efficiency-audit.md
   - ~/.claude/essays/skill-system-vs-superpowers.md

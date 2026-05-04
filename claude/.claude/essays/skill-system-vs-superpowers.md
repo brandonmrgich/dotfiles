@@ -567,3 +567,14 @@ The 8 unresolved items carried forward from this plan are listed in:
 Items #1–5 are prose-pruning sub-tasks for over-budget skill bodies. Item #6 is a manual cold-session smoke check covering five deferred audit gates. Item #7 is the empirical RED-dispatch re-run for the 8 discipline + ritual skills. Item #8 is a one-time YAML-quoting sweep across project-local skill dirs.
 
 These are non-blocking for plan closeout; they represent quality-residue work that didn't fit the per-task budget of this plan but should land before the next major skill-system audit cycle.
+
+---
+
+## Followup note (v3.1-v3.2)
+
+The Phase-8 follow-ups carried forward from `skills-trim-and-discipline` (v3.0) were closed in the `skills-trim-followups` plan (v3.1 setup, v3.2 closeout). Two gap-status revisions:
+
+- **Gap 8 (token budget) — now CLOSED.** All over-budget skills brought into compliance via prose pruning (Phase 1: 5 specialist trims) and linter recalibration (Phase 4: introduced `complex-orchestrator` class for the plan-executor/plan-auditor pair, loosened ritual + meta budgets, removed empty policy class). Final lint: 24 OK / 4 WARN / 0 FAIL across 28 skills — zero FAILs.
+- **Gap 1 carry-forward (empirical RED dispatches) — closed.** Eight discipline + ritual skills were dispatched in parallel from the orchestrator scope; all 8 PASSED with zero negative-example phrases and zero body changes. The hypothetical-RED labels from v3.0 held empirically, validating the original methodology. Operational standard accepted: "GREEN-with-loaded-skill" rather than purist RED, since Task-tool sub-agents see loaded skills via system-reminder. Full audit at `~/dotfiles/.claude/plans/skills-trim-followups/audits/07-red-dispatches-summary.md`.
+
+Followup details and the per-item closure ledger live in essay #9's `## Followup outcome (v3.1-v3.2)` section.
