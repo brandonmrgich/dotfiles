@@ -6,9 +6,10 @@
 > now lives in a dedicated repo:
 > [`brandonmrgich/bam-claude`](https://github.com/brandonmrgich/bam-claude).
 >
-> Touching anything under `~/.claude/`? Edit the source in `~/bam-claude/`
-> and run `stow -t ~/.claude -R .` from that repo. **Do not** add a `claude`
-> package back into this repo.
+> Touching anything under `~/.claude/`? Edit the source in
+> `~/Development/GithubTools/bam-claude/` and run
+> `stow -d .. -t ~/.claude -R bam-claude` from that repo. **Do not** add a
+> `claude` package back into this repo.
 
 ## Repo structure
 
@@ -68,7 +69,7 @@ stow -R <package>
 - **Never create manual symlinks in `~`.** All symlinks must be created and owned by stow. A manually created symlink breaks stow's conflict detection and will be flagged as "not owned by stow" on the next `stow --simulate`. If you find one, remove it and re-run stow.
 - `starship.toml` lives at `starship/.config/starship.toml` — stow targets `~/.config/starship.toml`.
 - `~/.zshrc.local` is intentionally untracked — use it for machine-local overrides.
-- Anything Claude-related belongs in `~/bam-claude/`, not here.
+- Anything Claude-related belongs in `~/Development/GithubTools/bam-claude/`, not here.
 
 ## STRICT: stow sync required
 
