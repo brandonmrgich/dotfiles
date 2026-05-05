@@ -1,12 +1,17 @@
 # dotfiles
 
-Personal macOS dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
+Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
+
+> **Claude Code config moved.** Everything that used to live in the
+> `claude/` package now lives in a dedicated repo:
+> [`brandonmrgich/bam-claude`](https://github.com/brandonmrgich/bam-claude).
+> See `CHANGELOG.md` and that repo's `MIGRATION.md` for the split details
+> and post-install steps for refreshing `~/.claude/` symlinks.
 
 ## What's included
 
 | Package    | What it configures |
 | ---------- | ------------------ |
-| `claude`   | Claude Code — global `CLAUDE.md` instructions + statusline script |
 | `git`      | Git identity, LFS, default branch |
 | `starship` | Shell prompt (directory, git branch/status/state) |
 | `tmux`     | Prefix `C-a`, vim-aware pane nav, vi copy mode, splits that inherit cwd |
@@ -19,7 +24,7 @@ git clone https://github.com/brandonmrgich/dotfiles ~/dotfiles
 cd ~/dotfiles
 
 # Apply all packages
-stow claude git starship tmux zsh
+stow git starship tmux zsh
 ```
 
 Or apply individually:
@@ -58,20 +63,16 @@ zsh/
 
 Local machine overrides go in `~/.zshrc.local` (untracked).
 
-## Claude Code statusline
+## Claude Code
 
-The `claude` package includes a statusline script that mirrors the Starship prompt and adds Claude-specific info:
+Claude Code's user-level config (`~/.claude/`, statusline, skills, agents,
+environment map, etc.) is no longer part of this repo. It lives at
+[`brandonmrgich/bam-claude`](https://github.com/brandonmrgich/bam-claude),
+stowed independently into `~/.claude/`.
 
-```
-dotfiles  main ~  Sonnet 4.6  ctx:42k/200k(21%)  5h:25% 7d:6%
-```
-
-- **directory** — truncated repo-relative path (cyan)
-- **branch** — current git branch (purple)
-- **git flags** — `+` staged, `~` modified, `?` untracked, `✘` deleted, `⇡⇣` ahead/behind (yellow)
-- **model** — active Claude model (cyan)
-- **ctx** — context window used / max with percentage, color-coded green → yellow → red (green/yellow/red)
-- **5h / 7d** — Claude Max plan usage percentages (green)
+If you previously stowed the old `claude` package from this repo, see
+`bam-claude`'s README § *Post-install: fix old stow links* for the steps
+that clean up dangling symlinks pointing into `~/dotfiles/claude/`.
 
 ## Adding new dotfiles
 
