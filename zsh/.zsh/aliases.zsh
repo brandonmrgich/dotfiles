@@ -12,6 +12,9 @@ alias c='clear'
 alias todo='grep -Ri "todo:" --exclude-dir={node_modules,.git,build}'
 alias loc='tokei'
 
+# Novelty / fun brew tools — kept intentionally; run `novelty` to remember them
+alias novelty='printf "%s\n" "novelty tools (brew-installed, kept on purpose):" "  asciiquarium   animated ASCII aquarium" "  cmatrix        Matrix rain" "  figlet <text>  big ASCII banner" "  lolcat         rainbow-colorize a pipe" "  gnuchess       terminal chess engine"'
+
 # Navigation
 alias work='cd ~/Development/GitHubProjects/MusicPortfolio/'
 alias ccfg='cd ~/Development/GithubTools/bam-claude'
