@@ -14,9 +14,22 @@
 [pull]
     ff = only
 
+# Written by `gh auth setup-git`, which hardcodes an absolute path to the gh it
+# found — /opt/homebrew/bin/gh on the M1. This file is stowed to every machine,
+# so that path broke ALL https pushes on debian-macbook (gh is /usr/bin/gh):
+#   /opt/homebrew/bin/gh auth git-credential get: 1: not found
+#   fatal: could not read Username for 'https://github.com'
+# The leading `!` runs the helper through a shell, so a bare `gh` resolves via
+# PATH and is correct on both machines. Do not re-run `gh auth setup-git`; it
+# will overwrite this with an absolute path again.
+#
+# Caveat: PATH-resolved means a caller with a minimal PATH (a macOS GUI git
+# client launched from Finder, an Automator action) won't find gh. If that
+# comes up, add the absolute path in an untracked ~/.gitconfig.local rather
+# than reintroducing it here — same pattern as ~/.zshrc.local.
 [credential "https://github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential
