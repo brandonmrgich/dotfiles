@@ -28,3 +28,16 @@ fi
 # Language & editor
 export LANG=en_US.UTF-8
 export EDITOR='nvim'
+
+# Shared Turborepo cache. Turbo defaults to <repo>/.turbo/cache, which is
+# per-CHECKOUT: every git worktree of the same monorepo grows its own copy and
+# none of them ever share a hit. MusicPortfolio's main checkout alone reached
+# 12 GB across 14,265 entries, and turbo never prunes.
+#
+# Set here rather than as `cacheDir` in turbo.json because that key resolves
+# RELATIVE to the repo root — a committed value cannot point every worktree at
+# one shared absolute path. The env var can.
+#
+# Safe to share: turbo cache keys are content hashes over each task's full
+# inputs, the same property that lets remote caching work across machines.
+export TURBO_CACHE_DIR="$HOME/.cache/turbo"
