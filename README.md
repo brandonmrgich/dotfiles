@@ -5,8 +5,8 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 > **Claude Code config moved.** Everything that used to live in the
 > `claude/` package now lives in a dedicated repo:
 > [`brandonmrgich/bam-claude`](https://github.com/brandonmrgich/bam-claude).
-> See `CHANGELOG.md` and that repo's `MIGRATION.md` for the split details
-> and post-install steps for refreshing `~/.claude/` symlinks.
+> See that repo's `MIGRATION.md` for the split details and post-install
+> steps for refreshing `~/.claude/` symlinks.
 
 ## What's included
 
