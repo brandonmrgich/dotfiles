@@ -12,7 +12,7 @@
 # TODO(claude-code > 2.1.202): on each Claude Code upgrade, delete this line and
 # retest fullscreen in a FRESH tmux pane; remove for good once upstream fixes it.
 # Tracking: https://github.com/anthropics/claude-code/issues/77615
-[[ -n $TMUX ]] && export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
+#[[ -n $TMUX ]] && export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
 
 # Create or attach to a session named after the current directory
 ts() {
