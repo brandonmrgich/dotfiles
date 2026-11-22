@@ -15,6 +15,10 @@
 #     merged or closed, and only when the tree is clean and its HEAD is the PR's last head.
 #     The registry is sandbox-writable, so the tree must also be a real worktree of the
 #     repo directly under .claude/worktrees, on a worktree-* branch.
+#   - --tidy runs git outside the sandbox in trees a sandboxed session used, so it first
+#     checks the tree's git links (.git file, gitdir, commondir, no config.worktree) and
+#     then runs git with fsmonitor and hooks off. A planted commondir pointing at a config
+#     with core.fsmonitor ran its command under a plain `git -C <tree> status` (tested).
 #     It runs from the owner's terminal: a sandboxed session can't write .git/worktrees.
 # gotchas:
 #   - The contract parser handles only this flat shape: `key: value` lines and an `allow:`
@@ -64,6 +68,9 @@ while (( $# )); do
   esac
 done
 [[ -n $repo ]] || { usage >&2; exit 2; }
+# The name lands in paths (the contract, the devlog rule), so it's a bare name only.
+name_re='^[A-Za-z0-9][A-Za-z0-9_-]*$'
+[[ $repo =~ $name_re ]] || die "bad repo name: $repo (letters, digits, - and _ only)"
 contract=$dir/$repo.md
 [[ -r $contract ]] || die "no contract at $contract (autopilot --list)"
 [[ $hours == <-> ]] || die "--hours takes a whole number"
@@ -84,28 +91,41 @@ allow=(${allow:#})
 
 # The contract's allow rules widen this run's permissions, so each must pass the owner's
 # allow-rule hygiene (memory feedback_allow_rule_hygiene) or the run doesn't start:
-#   - Bash(...): no shell metacharacters, `*` only as a final " *", not an arbitrary-exec verb.
-#   - Edit(~/...): a path inside the repo, with no "..".
+#   - Bash(...): plain words from [A-Za-z0-9._/=:,-] separated by single spaces, then
+#     optionally a final " *"; the first word isn't an arbitrary-exec verb.
+#   - Edit(~/...): a path inside the repo (symlinks resolved), with no "..", no .git
+#     component, and nothing under .claude/ but .claude/worktrees/ (project settings,
+#     hooks and skills would widen later sessions).
 #   - Nothing else. Widen this check deliberately if a contract ever needs more.
 exec_verbs=(sh bash zsh dash ksh fish env eval exec xargs sudo doas nohup command builtin
   source . time nice timeout watch python python3 node deno bun perl ruby php lua osascript
   open tmux screen ssh scp rsync curl wget nc ncat socat find awk gawk sed npx pnpx bunx
   pnpm npm yarn make just docker git claude)
 rule_ok() {
-  local r=$1 inner body verb p meta='[;&|`$<>(){}\\]'
+  local r=$1 inner body verb p rel base
+  local word='[A-Za-z0-9._/=:,-]+'
+  local words_re="^${word}( ${word})*\$"
   case $r in
     'Bash('*')')
       inner=${${r#Bash\(}%\)}
-      [[ $inner =~ $meta ]] && return 1
       body=${inner% \*}
-      [[ -n $body && $body != *\** ]] || return 1
+      [[ $body =~ $words_re ]] || return 1
       verb=${${body%% *}:t}
       (( ${exec_verbs[(Ie)$verb]} )) && return 1
       return 0 ;;
     'Edit(~/'*')')
       inner=${${r#Edit\(}%\)}
       p=${inner/#\~/$HOME}
-      [[ $p != *..* && ( $p == $repo_dir/* || $p == ${repo_dir:A}/* ) ]] ;;
+      [[ $p != *..* ]] || return 1
+      if [[ $p == ${repo_dir}/* ]]; then rel=${p#${repo_dir}/}
+      elif [[ $p == ${repo_dir:A}/* ]]; then rel=${p#${repo_dir:A}/}
+      else return 1; fi
+      [[ /$rel/ != */.git/* ]] || return 1
+      [[ $rel != .claude/* || $rel == .claude/worktrees/* ]] || return 1
+      # A symlink on the way could still lead out: resolve the longest existing prefix.
+      base=${p%%[\*\?\[]*}; base=${base%/}
+      while [[ ! -e $base && $base == */* ]]; do base=${base:h}; done
+      [[ ${base:A} == ${repo_dir:A} || ${base:A} == ${repo_dir:A}/* ]] ;;
     *) return 1 ;;
   esac
 }
@@ -144,12 +164,34 @@ tidy_trees() {
   known=(${${(M)${(f)"$(git -C "$repo_dir" worktree list --porcelain)"}:#worktree *}#worktree })
   known=(${known:A})
 
+  # The session that used a tree could write its git metadata (.git/worktrees/<id>/, and
+  # the tree's .git file), e.g. point commondir at a config with core.fsmonitor set. So git
+  # never runs in a tree until its links are the standard ones, and then without fsmonitor
+  # or hooks, against the gitdir found from the main repo's side.
+  local -a safe_git=(git -c core.fsmonitor=false -c core.hooksPath=/dev/null)
+  local -a G
+  local f gd link
+
   local row wt br port pr num state head lb st stamp note out what removed=0
   for row in $rows; do
     IFS=$'\t' read -r wt br port <<< "$row"
     [[ ${wt:A:h} == $root ]] || { print -r -- "skip    $wt: not under $root"; continue }
     if [[ -d $wt ]] && (( ! ${known[(Ie)${wt:A}]} )); then
       print -r -- "skip    ${wt:t}: not a worktree of $repo_dir"; continue
+    fi
+    if [[ -d $wt ]]; then
+      gd=''
+      for f in ${repo_dir:A}/.git/worktrees/*/gitdir(N); do
+        [[ ${$(<$f):A} == ${wt:A}/.git ]] && { gd=${f:h:A}; break }
+      done
+      [[ -n $gd ]] || { print -r -- "skip    ${wt:t}: no git metadata for it in $repo_dir/.git/worktrees"; continue }
+      link=''
+      [[ -f $wt/.git ]] && link=$(<$wt/.git) && link=${link#gitdir: }
+      [[ -n $link && ${link:A} == $gd ]] \
+        || { print -r -- "skip    ${wt:t}: its .git file doesn't point at $gd"; continue }
+      [[ $(<$gd/commondir) == ../.. && ! -e $gd/config.worktree ]] \
+        || { print -r -- "skip    ${wt:t}: nonstandard git metadata in $gd; check it by hand"; continue }
+      G=($safe_git --git-dir="$gd" --work-tree="$wt")
     fi
     if ! pr=$(gh pr list --head "$br" --state all --limit 1 --json number,state,headRefOid); then
       print -r -- "skip    ${wt:t}: gh couldn't look up $br"; continue
@@ -163,16 +205,16 @@ tidy_trees() {
 
     lb=''
     if [[ -d $wt ]]; then
-      [[ -z $(git -C "$wt" status --porcelain) ]] || { print -r -- "skip    ${wt:t}: uncommitted changes"; continue }
-      [[ $(git -C "$wt" rev-parse HEAD) == $head ]] || { print -r -- "skip    ${wt:t}: HEAD isn't PR #$num's last head; unpushed work?"; continue }
-      lb=$(git -C "$wt" branch --show-current)
+      [[ -z $($G status --porcelain) ]] || { print -r -- "skip    ${wt:t}: uncommitted changes"; continue }
+      [[ $($G rev-parse HEAD) == $head ]] || { print -r -- "skip    ${wt:t}: HEAD isn't PR #$num's last head; unpushed work?"; continue }
+      lb=$($G branch --show-current)
       [[ $lb == worktree-* ]] || { print -r -- "skip    ${wt:t}: branch '$lb' isn't a Claude Code worktree branch"; continue }
     fi
     if [[ -d $wt ]]; then
       what="tree and local branch removed by autopilot --tidy"
       (( dry )) && { print -r -- "would remove ${wt:t}${lb:+ and branch $lb} (PR #$num ${state:l})"; continue }
-      git -C "$repo_dir" worktree remove "$wt" || { print -r -- "skip    ${wt:t}: git worktree remove failed"; continue }
-      [[ -n $lb ]] && git -C "$repo_dir" branch -D "$lb" >/dev/null
+      $safe_git -C "$repo_dir" worktree remove "$wt" || { print -r -- "skip    ${wt:t}: git worktree remove failed"; continue }
+      [[ -n $lb ]] && $safe_git -C "$repo_dir" branch -D "$lb" >/dev/null
     else
       what="tree was already gone; entry closed by autopilot --tidy"
       (( dry )) && { print -r -- "would close ${wt:t}'s entry, tree already gone (PR #$num ${state:l})"; continue }
