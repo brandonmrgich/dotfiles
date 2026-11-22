@@ -61,7 +61,7 @@ stow -R <package>
 | `git`      | `~/.gitconfig`                  | User identity + LFS config                                  |
 | `starship` | `~/.config/starship.toml`       | Prompt: directory + git branch/status/state                 |
 | `tmux`     | `~/.config/tmux/tmux.conf`      | Prefix C-a, vim-aware nav, vi copy mode                     |
-| `zsh`      | `~/.zshrc`, `~/.zsh/`           | Modular: env → omz → completion → aliases → functions → tmux |
+| `zsh`      | `~/.zshrc`, `~/.zsh/`, `~/.local/bin/cbg` | Modular: env → omz → completion → aliases → functions → tmux. `cbg` starts background Claude sessions (tmux `prefix + a`) |
 
 ## Invariants
 

@@ -1,0 +1,164 @@
+#!/usr/bin/env zsh
+# ---
+# label: TOOL
+# role: starts a background Claude Code session (claude --bg) that shows up in `claude agents`;
+#   one entry point for shells, vim's inset terminal and the tmux popup on prefix + a.
+# invariants:
+#   - Never dispatches from a repo's main checkout without asking: there a background session
+#     moves itself into .claude/worktrees/<id> and may commit and push. Started inside an
+#     existing worktree it edits in place and asks before committing (agent-view docs, 2026-11).
+#     Skipped with -y, or when worktree.bgIsolation is "none" for that repo.
+#   - A one-word prompt that names an existing file becomes "Read <file> and carry it out."
+# gotchas:
+#   - Interactive mode needs a TTY (vared and read -q); the tmux popup provides one.
+#   - vared can't run in the script itself: `setopt zle` fails in a non-interactive
+#     shell (line 106 failure, 2026-11-22). edit_line runs it in `zsh -fi` instead.
+#   - claude runs in the foreground of this script, not captured, so a first-run trust or
+#     daemon prompt can still reach the terminal.
+# last-touched: 2026-11-22
+# ---
+
+usage() {
+  cat <<'EOF'
+cbg: start a background Claude Code session (listed in `claude agents`)
+
+  cbg [-C dir] [-n name] [-m model] [-y] <prompt words | prompt-file> [-- claude-args...]
+  cbg -i [-C dir]    interactive: pick a directory (fzf), then a name and a prompt
+  cbg -l [-C dir]    print the directories -i offers
+
+  -C dir    directory to start in (default: current directory)
+  -n name   session name (default: the directory's name, uppercased)
+  -m model  model alias or id, passed to claude --model
+  -y        don't ask before starting from a repo's main checkout
+
+A prompt that is a path to an existing file becomes "Read <file> and carry it out."
+tmux: prefix + a opens `cbg -i` in a popup; prefix + A opens agent view.
+CBG_DRY_RUN=1 prints the claude command instead of running it.
+EOF
+}
+
+die() { print -u2 -r -- "cbg: $*"; exit 1 }
+
+# True when $1 is the main checkout of a git repo, not a linked worktree.
+is_main_checkout() {
+  local gd common
+  gd=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  [[ $gd == $common ]]
+}
+
+# The worktree.bgIsolation in effect for $1: local, then project, then user settings.
+bg_isolation() {
+  local top f v
+  top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || top=$1
+  for f in "$top/.claude/settings.local.json" "$top/.claude/settings.json" "$HOME/.claude/settings.json"; do
+    [[ -r $f ]] || continue
+    v=$(jq -r '.worktree.bgIsolation // empty' "$f" 2>/dev/null)
+    [[ -n $v ]] && { print -r -- "$v"; return 0 }
+  done
+  print worktree
+}
+
+# Edit $2 on one line with prompt $1 and print the result. vared needs ZLE, which a
+# script can't switch on (setopt zle fails outside an interactive shell), so it runs
+# in a bare interactive zsh: -f skips the rc files, -i turns ZLE on. If vared can't
+# run or fails (exit 3), it falls back to read, where an empty answer keeps $2.
+# Ctrl+C at the fallback prompt cancels.
+edit_line() {
+  local out rc ans
+  out=$(zsh -fic '[[ -o zle && -t 0 ]] || exit 3; v=$2; vared -p "$1" v || exit 3; print -r -- "$v"' cbg "$1" "$2")
+  rc=$?
+  if (( rc == 3 )); then
+    read -r "ans?$1${2:+[$2] }" || return 1
+    print -r -- "${ans:-$2}"
+    return 0
+  fi
+  (( rc == 0 )) || return $rc
+  print -r -- "$out"
+}
+
+# $1 first, then its repo's git worktrees, then registered worktrees that still exist.
+candidate_dirs() {
+  local line reg=$HOME/.claude/worktree-registry.json
+  local -aU dirs
+  dirs=("$1")
+  # zsh runs the last stage of a pipeline in this shell, so dirs+= sticks.
+  git -C "$1" worktree list --porcelain 2>/dev/null | while IFS= read -r line; do
+    [[ $line == 'worktree '* ]] && dirs+=("${line#worktree }")
+  done
+  if [[ -r $reg ]] && (( $+commands[jq] )); then
+    jq -r '.worktrees[]?.worktree_path // empty' "$reg" 2>/dev/null | while IFS= read -r line; do
+      [[ -d $line ]] && dirs+=("$line")
+    done
+  fi
+  print -rl -- $dirs
+}
+
+dir=$PWD name='' model='' prompt='' interactive=0 list=0 yes=0
+typeset -a extra
+while (( $# )); do
+  case $1 in
+    -C|-n|-m) (( $# >= 2 )) || die "$1 needs a value"
+              case $1 in -C) dir=$2 ;; -n) name=$2 ;; -m) model=$2 ;; esac
+              shift 2 ;;
+    -y) yes=1; shift ;;
+    -i) interactive=1; shift ;;
+    -l) list=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; extra=("$@"); break ;;
+    -*) print -u2 -r -- "cbg: unknown option $1"; usage >&2; exit 2 ;;
+    *)  prompt=${prompt:+$prompt }$1; shift ;;
+  esac
+done
+
+[[ -d $dir ]] || die "no such directory: $dir"
+dir=${dir:a}
+
+if (( list )); then candidate_dirs "$dir"; exit 0; fi
+
+if (( interactive )); then
+  [[ -t 0 ]] || die "-i needs a terminal"
+  if (( $+commands[fzf] )); then
+    dir=$(candidate_dirs "$dir" | fzf --reverse --height=100% --prompt='dir> ' \
+      --header='Where the session starts. Esc cancels.') || exit 0
+  fi
+  [[ -n $name ]] || name=${(U)${dir:t}}
+  name=$(edit_line 'name> ' "$name") || exit 0
+  prompt=$(edit_line 'prompt (text or a file path)> ' "$prompt") || exit 0
+fi
+
+[[ -n $prompt ]] || { usage >&2; die "no prompt given"; }
+[[ -n $name ]] || name=${(U)${dir:t}}
+
+p=${prompt/#\~/$HOME}
+[[ $p != *[[:space:]]* && -f $p ]] && prompt="Read ${p:a} and carry it out."
+
+if (( ! yes )) && is_main_checkout "$dir" && [[ $(bg_isolation "$dir") != none ]]; then
+  print -u2 -r -- "cbg: $dir is a main checkout. The session will move itself into"
+  print -u2 -r -- "     .claude/worktrees/<id> and may commit and push there."
+  print -u2 -r -- "     Start it from a registered worktree instead, or pass -y."
+  read -q "?Start it anyway? [y/N] " || { print -u2; exit 1; }
+  print -u2
+fi
+
+claude_bin=${commands[claude]:-/opt/homebrew/bin/claude}
+typeset -a cmd
+cmd=("$claude_bin" --bg -n "$name")
+[[ -n $model ]] && cmd+=(--model "$model")
+cmd+=("${extra[@]}" "$prompt")
+
+if [[ -n ${CBG_DRY_RUN:-} ]]; then
+  print -r -- cd ${(q-)dir} '&&' ${(q-)cmd}
+  exit 0
+fi
+
+cd "$dir" || die "can't cd to $dir"
+"${cmd[@]}"
+rc=$?
+if (( rc == 0 )); then
+  [[ -n ${TMUX:-} ]] && tmux display-message "cbg: started $name (prefix + A for agent view)"
+else
+  print -u2 -r -- "cbg: claude exited $rc"
+  (( interactive )) && read -sk1 "?Press any key to close. "
+fi
+exit $rc
