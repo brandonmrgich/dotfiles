@@ -9,8 +9,8 @@
 #   - The session gets denyInsteadOfPrompting through --settings, scoped to this run only, so
 #     it never waits on a prompt; anything that would prompt is refused and logged.
 #   - The extra allow rules also live only in this run's --settings, never in settings.json.
-#   - Contract allow rules must pass rule_ok (no exec verbs, metacharacters or mid-command
-#     `*`; Edit only inside the repo), or the run doesn't start.
+#   - Contract allow rules must pass rule_ok, an allowlist (gh pr|issue subcommands; Edit
+#     of a plain path inside the repo), or the run doesn't start.
 #   - --tidy removes only trees autopilot registered (notes start "autopilot") whose PR is
 #     merged or closed, and only when the tree is clean and its HEAD is the PR's last head.
 #     The registry is sandbox-writable, so the tree must also be a real worktree of the
@@ -91,46 +91,46 @@ allow=(${allow:#})
 
 # The contract's allow rules widen this run's permissions, so each must pass the owner's
 # allow-rule hygiene (memory feedback_allow_rule_hygiene) or the run doesn't start:
-#   - Bash(...): plain words from [A-Za-z0-9._/=:,-] separated by single spaces, then
-#     optionally a final " *"; the first word isn't an arbitrary-exec verb.
-#   - Edit(~/...): a path inside the repo (symlinks resolved), with no "..", no .git
-#     component, and nothing under .claude/ but .claude/worktrees/ (project settings,
-#     hooks and skills would widen later sessions).
+#   - An allowlist, not a denylist: allow rules don't take a command out of the sandbox, so a
+#     Bash rule only matters for sandbox-excluded commands (gh, git push, git config...), and
+#     contracts need exactly `gh pr|issue <listed subcommand> [*]`. No merge, api, extension
+#     or alias.
+#   - Edit(~/...): a literal path inside the repo, optionally ending in "/**", and no other
+#     glob character, so the checks below see the real path. No "." or ".." segment, no .git
+#     component, nothing under .claude/ but .claude/worktrees (project settings, hooks and
+#     skills would widen later sessions). Every component before the last must already exist,
+#     and none may be a symlink. Whether a symlink made mid-run is followed is Claude Code's
+#     permission check at use time, not this one.
 #   - Nothing else. Widen this check deliberately if a contract ever needs more.
-exec_verbs=(sh bash zsh dash ksh fish env eval exec xargs sudo doas nohup command builtin
-  source . time nice timeout watch python python3 node deno bun perl ruby php lua osascript
-  open tmux screen ssh scp rsync curl wget nc ncat socat find awk gawk sed npx pnpx bunx
-  pnpm npm yarn make just docker git claude)
 rule_ok() {
-  local r=$1 inner body verb p rel base
-  local word='[A-Za-z0-9._/=:,-]+'
-  local words_re="^${word}( ${word})*\$"
+  local r=$1 inner lit rel comp p
+  local -a comps
+  local gh_re='^gh (pr (create|edit|comment|checks|view|list|diff|ready)|issue (edit|view|list))( \*)?$'
+  local path_re='^~(/[A-Za-z0-9._-]+)+(/\*\*)?$'
   case $r in
     'Bash('*')')
       inner=${${r#Bash\(}%\)}
-      body=${inner% \*}
-      [[ $body =~ $words_re ]] || return 1
-      verb=${${body%% *}:t}
-      (( ${exec_verbs[(Ie)$verb]} )) && return 1
-      return 0 ;;
-    'Edit(~/'*')')
+      [[ $inner =~ $gh_re ]] ;;
+    'Edit('*')')
       inner=${${r#Edit\(}%\)}
-      p=${inner/#\~/$HOME}
-      [[ $p != *..* ]] || return 1
-      if [[ $p == ${repo_dir}/* ]]; then rel=${p#${repo_dir}/}
-      elif [[ $p == ${repo_dir:A}/* ]]; then rel=${p#${repo_dir:A}/}
-      else return 1; fi
+      [[ $inner =~ $path_re && $inner/ != */./* && $inner/ != */../* ]] || return 1
+      lit=${${inner%/\*\*}/#\~/$HOME}
+      [[ $lit == $repo_dir/* ]] || return 1
+      rel=${lit#$repo_dir/}
       [[ /$rel/ != */.git/* ]] || return 1
-      [[ $rel != .claude/* || $rel == .claude/worktrees/* ]] || return 1
-      # A symlink on the way could still lead out: resolve the longest existing prefix.
-      base=${p%%[\*\?\[]*}; base=${base%/}
-      while [[ ! -e $base && $base == */* ]]; do base=${base:h}; done
-      [[ ${base:A} == ${repo_dir:A} || ${base:A} == ${repo_dir:A}/* ]] ;;
+      [[ $rel != .claude/* || $rel == .claude/worktrees || $rel == .claude/worktrees/* ]] || return 1
+      comps=(${(s:/:)rel}) p=$repo_dir
+      for comp in $comps; do
+        p=$p/$comp
+        [[ -L $p ]] && return 1
+        [[ -e $p || $p == $lit ]] || return 1
+      done
+      return 0 ;;
     *) return 1 ;;
   esac
 }
 for r in $allow; do
-  rule_ok "$r" || die "contract allow rule refused: $r (Bash without exec verbs, metacharacters or a mid-command *, or Edit inside $repo_dir)"
+  rule_ok "$r" || die "contract allow rule refused: $r (allowed: gh pr|issue <subcommand> [*], or Edit of a plain path inside $repo_dir; see rule_ok)"
 done
 # The devlog sits outside the repo, so the run needs an explicit write rule for it. The
 # launcher adds it itself; the contract can't.
