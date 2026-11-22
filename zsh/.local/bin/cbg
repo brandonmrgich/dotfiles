@@ -4,15 +4,21 @@
 # role: starts a background Claude Code session (claude --bg) that shows up in `claude agents`;
 #   one entry point for shells, vim's inset terminal and the tmux popup on prefix + a.
 # invariants:
-#   - Never dispatches from a repo's main checkout without asking: there a background session
-#     moves itself into .claude/worktrees/<id> and may commit and push. Started inside an
-#     existing worktree it edits in place and asks before committing (agent-view docs, 2026-11).
-#     Skipped with -y, or when worktree.bgIsolation is "none" for that repo.
+#   - Never dispatches from a repo's main checkout without a worktree plan: either -W (the
+#     session makes its own registered worktree with the worktree-orchestrator skill), or
+#     an explicit yes. Left alone there, a background session moves itself into
+#     .claude/worktrees/<id> and may commit and push (agent-view docs, 2026-11). Also
+#     skipped with -y, or when worktree.bgIsolation is "none" for that repo.
+#   - -W is repo-agnostic: the skill puts worktrees in the sibling <repo>-worktrees/ dir.
+#     Each repo needs that dir in sandbox.filesystem.allowWrite once (skill § Environment).
 #   - A one-word prompt that names an existing file becomes "Read <file> and carry it out."
+#   - No -n and no obvious name: agent view names the session from its prompt.
 # gotchas:
-#   - Interactive mode needs a TTY (vared and read -q); the tmux popup provides one.
+#   - Interactive mode needs a TTY (vared and read); the tmux popup provides one.
 #   - vared can't run in the script itself: `setopt zle` fails in a non-interactive
 #     shell (line 106 failure, 2026-11-22). edit_line runs it in `zsh -fi` instead.
+#   - The -W text must not forbid EnterWorktree outright: the skill needs its path mode
+#     to enter the new tree so the sandbox allows commits there.
 #   - claude runs in the foreground of this script, not captured, so a first-run trust or
 #     daemon prompt can still reach the terminal.
 # last-touched: 2026-11-22
@@ -22,22 +28,28 @@ usage() {
   cat <<'EOF'
 cbg: start a background Claude Code session (listed in `claude agents`)
 
-  cbg [-C dir] [-n name] [-m model] [-y] <prompt words | prompt-file> [-- claude-args...]
-  cbg -i [-C dir]    interactive: pick a directory (fzf), then a name and a prompt
+  cbg [-C dir] [-n name] [-m model] [-W] [-y] <prompt words | prompt-file> [-- claude-args...]
+  cbg -i [-C dir]    interactive: pick a directory (fzf), then a prompt and a name
   cbg -l [-C dir]    print the directories -i offers
 
   -C dir    directory to start in (default: current directory)
-  -n name   session name (default: the directory's name, uppercased)
+  -n name   session name (default: the prompt file's name, else a linked worktree's
+            name, uppercased; from a main checkout, agent view names it)
   -m model  model alias or id, passed to claude --model
+  -W        the session creates its own registered worktree with the
+            worktree-orchestrator skill and works there (any repo)
   -y        don't ask before starting from a repo's main checkout
 
 A prompt that is a path to an existing file becomes "Read <file> and carry it out."
+Batch:  for f in ~/Desktop/forClaude/assign-*.md; do cbg -W -C <repo> "$f"; done
 tmux: prefix + a opens `cbg -i` in a popup; prefix + A opens agent view.
 CBG_DRY_RUN=1 prints the claude command instead of running it.
 EOF
 }
 
 die() { print -u2 -r -- "cbg: $*"; exit 1 }
+
+W_TEXT="Before editing anything, use the worktree-orchestrator skill to create, register and enter this task's worktree (the repo's sibling <repo>-worktrees path, not a .claude/worktrees one), and make every edit there."
 
 # True when $1 is the main checkout of a git repo, not a linked worktree.
 is_main_checkout() {
@@ -57,6 +69,11 @@ bg_isolation() {
     [[ -n $v ]] && { print -r -- "$v"; return 0 }
   done
   print worktree
+}
+
+# A main checkout where a background session would make its own .claude/worktrees tree.
+needs_worktree_plan() {
+  is_main_checkout "$1" && [[ $(bg_isolation "$1") != none ]]
 }
 
 # Edit $2 on one line with prompt $1 and print the result. vared needs ZLE, which a
@@ -94,13 +111,30 @@ candidate_dirs() {
   print -rl -- $dirs
 }
 
-dir=$PWD name='' model='' prompt='' interactive=0 list=0 yes=0
+# The prompt as a file path, if it is one (a single word naming an existing file).
+prompt_file() {
+  local p=${1/#\~/$HOME}
+  [[ $p != *[[:space:]]* && -f $p ]] && print -r -- "${p:a}"
+}
+
+# Default name: the prompt file's name, else a linked worktree's name, else none
+# (agent view names the session from its prompt).
+default_name() {  # dir prompt
+  local f
+  f=$(prompt_file "$2")
+  if [[ -n $f ]]; then print -r -- "${(U)${f:t:r}}"
+  elif ! is_main_checkout "$1"; then print -r -- "${(U)${1:t}}"
+  fi
+}
+
+dir=$PWD name='' model='' prompt='' interactive=0 list=0 yes=0 worktree=0
 typeset -a extra
 while (( $# )); do
   case $1 in
     -C|-n|-m) (( $# >= 2 )) || die "$1 needs a value"
               case $1 in -C) dir=$2 ;; -n) name=$2 ;; -m) model=$2 ;; esac
               shift 2 ;;
+    -W) worktree=1; shift ;;
     -y) yes=1; shift ;;
     -i) interactive=1; shift ;;
     -l) list=1; shift ;;
@@ -122,28 +156,37 @@ if (( interactive )); then
     dir=$(candidate_dirs "$dir" | fzf --reverse --height=100% --prompt='dir> ' \
       --header='Where the session starts. Esc cancels.') || exit 0
   fi
-  [[ -n $name ]] || name=${(U)${dir:t}}
-  name=$(edit_line 'name> ' "$name") || exit 0
   prompt=$(edit_line 'prompt (text or a file path)> ' "$prompt") || exit 0
+  if (( ! worktree )) && needs_worktree_plan "$dir"; then
+    print -r -- "Main checkout. y: the session makes its own registered worktree (worktree-orchestrator)."
+    print -r -- "n: Claude Code's own .claude/worktrees tree, which commits and pushes without asking."
+    read -k1 "ans?Worktree via worktree-orchestrator? [Y/n] " || exit 0
+    print
+    [[ $ans == [nN] ]] && yes=1 || worktree=1
+  fi
+  [[ -n $name ]] || name=$(default_name "$dir" "$prompt")
+  name=$(edit_line 'name (empty: agent view names it)> ' "$name") || exit 0
 fi
 
 [[ -n $prompt ]] || { usage >&2; die "no prompt given"; }
-[[ -n $name ]] || name=${(U)${dir:t}}
+[[ -n $name ]] || name=$(default_name "$dir" "$prompt")
 
-p=${prompt/#\~/$HOME}
-[[ $p != *[[:space:]]* && -f $p ]] && prompt="Read ${p:a} and carry it out."
+f=$(prompt_file "$prompt")
+[[ -n $f ]] && prompt="Read $f and carry it out."
+(( worktree )) && prompt="$W_TEXT"$'\n\n'"Task: $prompt"
 
-if (( ! yes )) && is_main_checkout "$dir" && [[ $(bg_isolation "$dir") != none ]]; then
+if (( ! yes && ! worktree )) && needs_worktree_plan "$dir"; then
   print -u2 -r -- "cbg: $dir is a main checkout. The session will move itself into"
   print -u2 -r -- "     .claude/worktrees/<id> and may commit and push there."
-  print -u2 -r -- "     Start it from a registered worktree instead, or pass -y."
+  print -u2 -r -- "     Pass -W to have it make a registered worktree instead, or -y."
   read -q "?Start it anyway? [y/N] " || { print -u2; exit 1; }
   print -u2
 fi
 
 claude_bin=${commands[claude]:-/opt/homebrew/bin/claude}
 typeset -a cmd
-cmd=("$claude_bin" --bg -n "$name")
+cmd=("$claude_bin" --bg)
+[[ -n $name ]] && cmd+=(-n "$name")
 [[ -n $model ]] && cmd+=(--model "$model")
 cmd+=("${extra[@]}" "$prompt")
 
@@ -156,7 +199,7 @@ cd "$dir" || die "can't cd to $dir"
 "${cmd[@]}"
 rc=$?
 if (( rc == 0 )); then
-  [[ -n ${TMUX:-} ]] && tmux display-message "cbg: started $name (prefix + A for agent view)"
+  [[ -n ${TMUX:-} ]] && tmux display-message "cbg: started ${name:-a session} (prefix + A for agent view)"
 else
   print -u2 -r -- "cbg: claude exited $rc"
   (( interactive )) && read -sk1 "?Press any key to close. "
