@@ -1,0 +1,175 @@
+#!/usr/bin/env zsh
+# ---
+# label: TOOL
+# role: starts an unattended autopilot run (the autopilot skill) on one repo as a background
+#   Claude Code session that shows up in `claude agents`, and keeps the Mac awake for it.
+# invariants:
+#   - Reads the repo's contract at ~/.claude/autopilot/<repo>.md (bam-claude); its frontmatter
+#     gives the path, effort, bg_isolation and extra allow rules.
+#   - The session gets denyInsteadOfPrompting through --settings, scoped to this run only, so
+#     it never waits on a prompt; anything that would prompt is refused and logged.
+#   - The extra allow rules also live only in this run's --settings, never in settings.json.
+#   - --tidy removes only trees autopilot registered (notes start "autopilot") whose PR is
+#     merged or closed, and only when the tree is clean and its HEAD is the PR's last head.
+#     It runs from the owner's terminal: a sandboxed session can't write .git/worktrees.
+# gotchas:
+#   - The contract parser handles only this flat shape: `key: value` lines and an `allow:`
+#     list of `  - "rule"` lines. Keep the frontmatter that simple.
+#   - caffeinate keeps the Mac awake on its own, but not with the lid closed on battery.
+#   - Never name a variable `path` here: zsh ties it to $PATH (first dry run lost awk and jq).
+#   - Starting the same repo twice runs two sessions on it. Check `claude agents` first.
+# last-touched: 2026-11-22
+# ---
+
+usage() {
+  cat <<'EOF'
+autopilot: start an unattended development run on a repo (see the autopilot skill)
+
+  autopilot <repo> [--item REF] [--hours N] [--dry-run]
+  autopilot --tidy <repo> [--dry-run]
+  autopilot --list
+
+  <repo>      a contract name in ~/.claude/autopilot/ (play, music-platform, ...)
+  --item REF  work only this one item (an issue number like 991, or a backlog line),
+              still under the contract's eligibility and off-limits rules
+  --hours N   keep the Mac awake for N hours (default 10)
+  --tidy      instead of starting a run, remove the worktrees and local branches of this
+              repo's autopilot PRs that are merged or closed, and mark them in the registry
+  --dry-run   print the claude command and settings instead of starting (with --tidy:
+              print what it would remove)
+
+The run's devlog: ~/.claude/devlogs/autopilot-<repo>-devlog.md (essay server: /devlogs).
+Watch it in agent view: prefix + A, or `claude agents`.
+EOF
+}
+
+die() { print -u2 -r -- "autopilot: $*"; exit 1 }
+
+dir=$HOME/.claude/autopilot
+repo='' hours=10 dry=0 item='' tidy=0
+while (( $# )); do
+  case $1 in
+    --hours) (( $# >= 2 )) || die "--hours needs a value"; hours=$2; shift 2 ;;
+    --item) (( $# >= 2 )) || die "--item needs a value"; item=$2; shift 2 ;;
+    --dry-run) dry=1; shift ;;
+    --tidy) tidy=1; shift ;;
+    --list) for f in $dir/*.md(N); do print -r -- ${f:t:r}; done; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    -*) die "unknown option $1 (try -h)" ;;
+    *) [[ -z $repo ]] || die "one repo at a time"; repo=$1; shift ;;
+  esac
+done
+[[ -n $repo ]] || { usage >&2; exit 2; }
+contract=$dir/$repo.md
+[[ -r $contract ]] || die "no contract at $contract (autopilot --list)"
+[[ $hours == <-> ]] || die "--hours takes a whole number"
+
+# Frontmatter: the lines between the first two '---'.
+fm=$(awk '/^---$/ { n++; next } n == 1' "$contract")
+field() { print -r -- "$fm" | awk -v k="$1" -F': *' '$1 == k { sub(/^[^:]*: */, ""); print; exit }' }
+# Not `path`: in zsh that name is tied to $PATH, and assigning it breaks every command.
+repo_dir=$(field path); repo_dir=${repo_dir/#\~/$HOME}
+effort=$(field effort)
+isolation=$(field bg_isolation)
+typeset -a allow
+allow=("${(@f)$(print -r -- "$fm" | awk '/^allow:/ { a = 1; next } a && /^  - / { sub(/^  - /, ""); gsub(/^"|"$/, ""); print; next } a { a = 0 }')}")
+allow=(${allow:#})
+# The devlog sits outside the repo, so the run needs an explicit write rule for it.
+allow+=("Edit(~/.claude/devlogs/autopilot-$repo-devlog.md)")
+
+[[ -d $repo_dir ]] || die "contract path doesn't exist: $repo_dir"
+
+# --tidy: retire the trees of autopilot PRs that merged or closed. Registry-driven, so it
+# never touches a .claude/worktrees tree some other session made.
+tidy_trees() {
+  local reg=$HOME/.claude/worktree-registry.json rname=${$(field repo):-$repo}
+  [[ -r $reg ]] || die "no registry at $reg"
+  (( $+commands[gh] )) || die "--tidy needs gh"
+  cd "$repo_dir" || die "can't cd to $repo_dir"
+  local -a rows
+  rows=("${(@f)$(jq -r --arg r "$rname" '.worktrees[]
+      | select(.repo == $r and .status == "active" and ((.notes // "") | startswith("autopilot")))
+      | [.worktree_path, .branch, (.port_offset // "" | tostring)] | @tsv' "$reg")}")
+  rows=(${rows:#})
+  (( $#rows )) || { print -r -- "autopilot: no active autopilot worktrees for $rname"; return 0 }
+
+  local row wt br port pr num state head lb st stamp note out what removed=0
+  for row in $rows; do
+    IFS=$'\t' read -r wt br port <<< "$row"
+    if ! pr=$(gh pr list --head "$br" --state all --limit 1 --json number,state,headRefOid); then
+      print -r -- "skip    ${wt:t}: gh couldn't look up $br"; continue
+    fi
+    num=$(jq -r '.[0].number // empty' <<< "$pr")
+    state=$(jq -r '.[0].state // empty' <<< "$pr")
+    head=$(jq -r '.[0].headRefOid // empty' <<< "$pr")
+    [[ -n $num ]] || { print -r -- "keep    ${wt:t}: no PR for $br"; continue }
+    [[ $state == OPEN ]] && { print -r -- "keep    ${wt:t}: PR #$num is open"; continue }
+    [[ -z $port ]] || { print -r -- "skip    ${wt:t}: has a dev stack (port offset $port); use worktree-orchestrator cleanup"; continue }
+
+    lb=''
+    if [[ -d $wt ]]; then
+      [[ -z $(git -C "$wt" status --porcelain) ]] || { print -r -- "skip    ${wt:t}: uncommitted changes"; continue }
+      [[ $(git -C "$wt" rev-parse HEAD) == $head ]] || { print -r -- "skip    ${wt:t}: HEAD isn't PR #$num's last head; unpushed work?"; continue }
+      lb=$(git -C "$wt" branch --show-current)
+    fi
+    if [[ -d $wt ]]; then
+      what="tree and local branch removed by autopilot --tidy"
+      (( dry )) && { print -r -- "would remove ${wt:t}${lb:+ and branch $lb} (PR #$num ${state:l})"; continue }
+      git -C "$repo_dir" worktree remove "$wt" || { print -r -- "skip    ${wt:t}: git worktree remove failed"; continue }
+      [[ -n $lb ]] && git -C "$repo_dir" branch -D "$lb" >/dev/null
+    else
+      what="tree was already gone; entry closed by autopilot --tidy"
+      (( dry )) && { print -r -- "would close ${wt:t}'s entry, tree already gone (PR #$num ${state:l})"; continue }
+    fi
+
+    if [[ $state == MERGED ]]; then
+      st=merged stamp=merged_at note=" | Merged as PR #$num; $what."
+    else
+      st=abandoned stamp=abandoned_at note=" | PR #$num closed unmerged; $what."
+    fi
+    # Write in place (not mv) so the file keeps its inode and permissions.
+    out=$(jq --arg w "$wt" --arg s "$st" --arg k "$stamp" --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg n "$note" '
+      .worktrees |= map(if .worktree_path == $w and .status == "active"
+        then .status = $s | .[$k] = $t | .port_offset = null | .notes += $n else . end)' "$reg") \
+      && print -r -- "$out" > "$reg" || print -r -- "warn    ${wt:t}: removed, but the registry update failed"
+    print -r -- "done    ${wt:t}: PR #$num ${state:l}, $what"
+    (( removed++ ))
+  done
+  (( dry )) || print -r -- "autopilot: tidied $removed tree(s) for $rname"
+}
+if (( tidy )); then
+  tidy_trees; exit $?
+fi
+
+settings=$(jq -n --argjson allow "$(print -rl -- $allow | jq -R . | jq -s .)" --arg iso "$isolation" '
+  { permissions: { denyInsteadOfPrompting: true, allow: $allow },
+    autoContinueAtUsageLimit: true }
+  + (if $iso != "" then { worktree: { bgIsolation: $iso } } else {} end)')
+
+name="AUTOPILOT-${(U)repo}-$(date +%m%d)${item:+-${item//[^A-Za-z0-9]/}}"
+prompt="Run the autopilot skill for $repo. Contract: ~/.claude/autopilot/$repo.md. This is an unattended run: nobody will answer prompts or questions until it ends, so record every question and blocker in the devlog."
+if [[ -n $item ]]; then
+  [[ $item == <-> ]] && ref="issue #$item" || ref="the backlog item \"$item\""
+  prompt+=" This run is limited to one item, $ref: skip phase 2 (tending other work), the contract's extra phases such as Triage, and every other item. If it isn't eligible under the contract, build nothing and log why."
+fi
+
+claude_bin=${commands[claude]:-/opt/homebrew/bin/claude}
+typeset -a cmd
+cmd=("$claude_bin" --bg -n "$name" --settings "$settings")
+[[ -n $effort ]] && cmd+=(--effort "$effort")
+cmd+=("$prompt")
+
+if (( dry )); then
+  print -r -- "cd ${(q-)repo_dir}"
+  print -r -- "caffeinate -i -t $(( hours * 3600 ))"
+  print -r -- ${(q-)cmd}
+  print -r -- "settings:"; print -r -- "$settings" | jq .
+  exit 0
+fi
+
+cd "$repo_dir" || die "can't cd to $repo_dir"
+"${cmd[@]}" || die "claude --bg failed"
+setopt no_bg_nice
+caffeinate -i -t $(( hours * 3600 )) &!
+[[ -n ${TMUX:-} ]] && tmux display-message "autopilot: $name started; devlog: autopilot-$repo-devlog"
+print -r -- "autopilot: $name started; the Mac stays awake for $hours h. Devlogs: http://localhost:9100/devlogs"
