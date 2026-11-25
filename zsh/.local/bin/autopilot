@@ -15,6 +15,11 @@
 #     merged or closed, and only when the tree is clean and its HEAD is the PR's last head.
 #     The registry is sandbox-writable, so the tree must also be a real worktree of the
 #     repo directly under .claude/worktrees, on a worktree-* branch.
+#   - --tidy also takes autopilot rows another session already marked merged or abandoned
+#     while their tree is still on disk (the coordinator marks a row at merge time and the
+#     sandbox keeps it from removing the tree). GitHub's PR state still decides; an existing
+#     merged_at/abandoned_at is kept, otherwise the stamp is GitHub's merge or close time.
+#     Rows whose notes don't start "autopilot" are never taken, whatever their status.
 #   - --tidy runs git outside the sandbox in trees a sandboxed session used, so it first
 #     checks the tree's git links (.git file, gitdir, commondir, no config.worktree) and
 #     then runs git with fsmonitor and hooks off. A planted commondir pointing at a config
@@ -26,7 +31,7 @@
 #   - caffeinate keeps the Mac awake on its own, but not with the lid closed on battery.
 #   - Never name a variable `path` here: zsh ties it to $PATH (first dry run lost awk and jq).
 #   - Starting the same repo twice runs two sessions on it. Check `claude agents` first.
-# last-touched: 2026-11-22
+# last-touched: 2026-11-24
 # ---
 
 usage() {
@@ -151,10 +156,11 @@ tidy_trees() {
   cd "$repo_dir" || die "can't cd to $repo_dir"
   local -a rows
   rows=("${(@f)$(jq -r --arg r "$rname" '.worktrees[]
-      | select(.repo == $r and .status == "active" and ((.notes // "") | startswith("autopilot")))
-      | [.worktree_path, .branch, (.port_offset // "" | tostring)] | @tsv' "$reg")}")
+      | select(.repo == $r and ((.notes // "") | startswith("autopilot"))
+          and (.status == "active" or .status == "merged" or .status == "abandoned"))
+      | [.worktree_path, .branch, .status, (.port_offset // "" | tostring)] | @tsv' "$reg")}")
   rows=(${rows:#})
-  (( $#rows )) || { print -r -- "autopilot: no active autopilot worktrees for $rname"; return 0 }
+  (( $#rows )) || { print -r -- "autopilot: no autopilot worktrees registered for $rname"; return 0 }
 
   # Sandboxed sessions can write the registry, so an entry only names a candidate: the tree
   # must also sit directly under this repo's .claude/worktrees and, if it exists, be one of
@@ -172,9 +178,13 @@ tidy_trees() {
   local -a G
   local f gd link
 
-  local row wt br port pr num state head lb st stamp note out what removed=0
+  local row wt br port rst pr num state head when lb st stamp note out what removed=0
   for row in $rows; do
-    IFS=$'\t' read -r wt br port <<< "$row"
+    # Tab is IFS whitespace, so an empty field collapses: keep the one that can be empty
+    # (port) last.
+    IFS=$'\t' read -r wt br rst port <<< "$row"
+    # A row already marked merged or abandoned is only work if its tree is still on disk.
+    [[ $rst != active && ! -e $wt ]] && continue
     [[ ${wt:A:h} == $root ]] || { print -r -- "skip    $wt: not under $root"; continue }
     if [[ -d $wt ]] && (( ! ${known[(Ie)${wt:A}]} )); then
       print -r -- "skip    ${wt:t}: not a worktree of $repo_dir"; continue
@@ -193,12 +203,13 @@ tidy_trees() {
         || { print -r -- "skip    ${wt:t}: nonstandard git metadata in $gd; check it by hand"; continue }
       G=($safe_git --git-dir="$gd" --work-tree="$wt")
     fi
-    if ! pr=$(gh pr list --head "$br" --state all --limit 1 --json number,state,headRefOid); then
+    if ! pr=$(gh pr list --head "$br" --state all --limit 1 --json number,state,headRefOid,mergedAt,closedAt); then
       print -r -- "skip    ${wt:t}: gh couldn't look up $br"; continue
     fi
     num=$(jq -r '.[0].number // empty' <<< "$pr")
     state=$(jq -r '.[0].state // empty' <<< "$pr")
     head=$(jq -r '.[0].headRefOid // empty' <<< "$pr")
+    when=$(jq -r '.[0].mergedAt // .[0].closedAt // empty' <<< "$pr")
     [[ -n $num ]] || { print -r -- "keep    ${wt:t}: no PR for $br"; continue }
     [[ $state == OPEN ]] && { print -r -- "keep    ${wt:t}: PR #$num is open"; continue }
     [[ -z $port ]] || { print -r -- "skip    ${wt:t}: has a dev stack (port offset $port); use worktree-orchestrator cleanup"; continue }
@@ -226,9 +237,10 @@ tidy_trees() {
       st=abandoned stamp=abandoned_at note=" | PR #$num closed unmerged; $what."
     fi
     # Write in place (not mv) so the file keeps its inode and permissions.
-    out=$(jq --arg w "$wt" --arg s "$st" --arg k "$stamp" --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg n "$note" '
-      .worktrees |= map(if .worktree_path == $w and .status == "active"
-        then .status = $s | .[$k] = $t | .port_offset = null | .notes += $n else . end)' "$reg") \
+    out=$(jq --arg w "$wt" --arg old "$rst" --arg s "$st" --arg k "$stamp" \
+        --arg t "${when:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" --arg n "$note" '
+      .worktrees |= map(if .worktree_path == $w and .status == $old
+        then .status = $s | .[$k] //= $t | .port_offset = null | .notes += $n else . end)' "$reg") \
       && print -r -- "$out" > "$reg" || print -r -- "warn    ${wt:t}: removed, but the registry update failed"
     print -r -- "done    ${wt:t}: PR #$num ${state:l}, $what"
     (( removed++ ))
