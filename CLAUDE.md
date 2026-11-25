@@ -61,7 +61,7 @@ stow -R <package>
 | `git`      | `~/.gitconfig`                  | User identity + LFS config                                  |
 | `starship` | `~/.config/starship.toml`       | Prompt: directory + git branch/status/state                 |
 | `tmux`     | `~/.config/tmux/tmux.conf`      | Prefix C-a, vim-aware nav, vi copy mode                     |
-| `zsh`      | `~/.zshrc`, `~/.zsh/`, `~/.local/bin/cbg` | Modular: env → omz → completion → aliases → functions → tmux. `cbg` starts background Claude sessions (tmux `prefix + a`) |
+| `zsh`      | `~/.zshrc`, `~/.zsh/`, `~/.local/bin/cbg` | Modular: env → omz → completion → aliases → nav → functions → tmux. `nav` lists the directory bookmarks (`mp`, `bam`, `dots`, …; each is also a `~name` path). `cbg` starts background Claude sessions (tmux `prefix + a`) |
 
 ## Invariants
 

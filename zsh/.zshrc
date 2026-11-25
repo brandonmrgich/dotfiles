@@ -26,6 +26,7 @@ add-zsh-hook precmd _bp_precmd
 # --- Post-OMZ modules ---
 source ~/.zsh/completion.zsh
 source ~/.zsh/aliases.zsh
+source ~/.zsh/nav.zsh
 source ~/.zsh/functions.zsh
 source ~/.zsh/tmux.zsh
 

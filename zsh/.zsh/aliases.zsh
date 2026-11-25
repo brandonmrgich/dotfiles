@@ -1,5 +1,9 @@
 # shellcheck shell=bash
 # aliases.zsh — shell aliases
+#
+# label: SIMPLE
+# role: supports feature — command shorthands; directory bookmarks live in nav.zsh
+# last-touched: 2026-11-24
 
 # Defaults
 alias vim='nvim'
@@ -14,11 +18,6 @@ alias loc='tokei'
 
 # Novelty / fun brew tools — kept intentionally; run `novelty` to remember them
 alias novelty='printf "%s\n" "novelty tools (brew-installed, kept on purpose):" "  asciiquarium   animated ASCII aquarium" "  cmatrix        Matrix rain" "  figlet <text>  big ASCII banner" "  lolcat         rainbow-colorize a pipe" "  gnuchess       terminal chess engine"'
-
-# Navigation
-alias work='cd ~/Development/GitHubProjects/MusicPortfolio/'
-alias ccfg='cd ~/Development/GithubTools/bam-claude'
-alias dotfiles='cd ~/dotfiles'
 
 # Tail github runner logs (Debian agent host only)
 if [[ "$(uname -s)" == "Linux" ]] && command -v systemctl >/dev/null 2>&1 &&
