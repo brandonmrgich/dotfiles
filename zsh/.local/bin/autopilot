@@ -126,17 +126,21 @@ git_config_ok() {
 #   - Scope: the commands Claude Code may run unsandboxed as gh, which are those whose
 #     command word is gh. A gh nested anywhere else (in $(...), sh -c, python -c) runs
 #     inside the sandbox, where it can't reach GitHub: TLS fails with OSStatus -26276
-#     (measured). So the guard doesn't try to find gh in arbitrary shell text; every
-#     attempt to do that had bypasses or refused ordinary commands.
+#     (measured). The guard's checks on nested gh are defence in depth on top of that,
+#     kept to what doesn't refuse ordinary commands.
 #   - gh runs only as one plain command: first word gh (lowercase, unquoted), and no
 #     separator, redirect, substitution, variable, glob, brace or ~ in it.
-#   - Refused outright: any segment whose command word, after assignments and wrapper
-#     precommands (env, xargs, time, timeout...), is gh, however it's spelled (GH, g''h,
-#     =gh, /path/gh). Also a command word or wrapper argument holding $ or `, which could
-#     be gh at run time.
-#   - gh runs only from the contract repo or one of its worktrees: gh picks the repo from
-#     the working directory's git remote, so the checkout's common git dir must be the
-#     contract repo's. A nested repo with its own remote fails this check.
+#   - Refused outright: any segment whose command word is gh however it's spelled (GH,
+#     g''h, =gh, /path/gh), after assignments, redirects (>out gh ...) and wrapper
+#     precommands (env, xargs, time, timeout...). Also a command word or wrapper argument
+#     that could become gh at run time: a variable, substitution or glob.
+#   - Defence in depth: gh text inside a substitution, or in a segment run by sh -c, eval
+#     or source, with quotes stripped (bash -c 'g""h ...').
+#   - gh runs only from the contract repo or one of its standard worktrees. gh picks the
+#     repo from the working directory's git remote, and its own git calls run
+#     unsandboxed, so the common git dir must be the contract repo's, a worktree's links
+#     must be the standard ones, and the config must pass git_config_ok. A nested repo, or
+#     a .git file pointing at a planted gitdir, fails.
 #   - Per subcommand, only the flags in ghflags. That leaves out --repo/-R, --web, --editor,
 #     --recover, --show-token and --body-file/-F. A body file could be swapped for a
 #     symlink after this check and before gh opens it, so bodies go inline: --body '...'
@@ -147,12 +151,15 @@ git_config_ok() {
 # an explicit pass exits 0. On 2026-11-24 it blocked -R and g''h in a headless session
 # with the music-platform settings, and -R in an isolation-worktree subagent of it, while
 # a plain `gh pr view` went through.
-has_expansion() {  # <raw word> [subst]: 0 when the shell would expand something in it
-  # subst: only parameter, command and process substitution count ($, `, <( and >(), for
-  # checking command words without refusing [[, [ or a # comment line.
-  # =word at the start is zsh's command-path expansion (=gh is /opt/homebrew/bin/gh);
-  # ^ and # are globs under extended_glob.
-  local w=$1 c q='' i subst=${2:-}
+has_expansion() {  # <raw word> [subst|cmdword]: 0 when the shell would expand something in it
+  # (default) anything: substitutions, globs, braces, ~, and a leading = (zsh's
+  #   command-path expansion: =gh is /opt/homebrew/bin/gh). ^ and # are globs under
+  #   extended_glob.
+  # subst: only parameter, command and process substitution ($, `, <( and >().
+  # cmdword: what could turn a command word into gh, without refusing [[, [, a # comment
+  #   or ~/path: [ only with a ] after it, { only as a {a,b} or {a..b} expansion, # only
+  #   after the first character, ~ only other than a leading ~/ or a lone ~.
+  local w=$1 c q='' i mode=${2:-}
   for (( i = 1; i <= $#w; i++ )); do
     c=$w[i]
     if [[ $q == "'" ]]; then [[ $c == "'" ]] && q=''; continue; fi
@@ -163,14 +170,19 @@ has_expansion() {  # <raw word> [subst]: 0 when the shell would expand something
       continue
     fi
     case $c in
-      ("'") q="'" ;;
-      ('"') q='"' ;;
+      ("'") q="'"; continue ;;
+      ('"') q='"'; continue ;;
       ('$'|'`') return 0 ;;
       ('<'|'>') [[ ${w[i+1]-} == '(' ]] && return 0 ;;
     esac
-    [[ -n $subst ]] && continue
+    [[ $mode == subst ]] && continue
     case $c in
-      ('*'|'?'|'['|'{'|'}'|'^'|'#'|'~') return 0 ;;
+      ('*'|'?'|'^') return 0 ;;
+      ('[') [[ $mode != cmdword || ${w[i+1,-1]} == *']'* ]] && return 0 ;;
+      ('{') [[ $mode != cmdword || ${w[i+1,-1]} == *(,|..)*'}'* ]] && return 0 ;;
+      ('}') [[ $mode != cmdword ]] && return 0 ;;
+      ('#') [[ $mode != cmdword ]] || (( i > 1 )) && return 0 ;;
+      ('~') [[ $mode == cmdword ]] && (( i == 1 )) && [[ -z ${w[2]-} || ${w[2]} == / ]] || return 0 ;;
       ('=') (( i == 1 )) && return 0 ;;
     esac
   done
@@ -188,45 +200,104 @@ gh_guard() {
   local -a raw val
   raw=("${(@z)cmd}")
   val=("${(@Q)raw}")
+  local ghword='(^|[^a-z0-9_.-])gh([^a-z0-9_.-]|$)'  # matched against lowercased text
   local i
   no() { print -u2 -r -- "autopilot guard: $*"; return 1 }
   # '=gh' quoted: unquoted, zsh's equals expansion turns the pattern itself into a path.
   isgh() { [[ ${1:l} == gh || ${1:l} == */gh || ${1:l} == '=gh' ]] }
 
   if [[ $raw[1] != gh ]]; then
-    # Any operator-only token (separators, pipes, redirects, parens, braces) resets to
-    # command position, as do the reserved words that can lead a command. (z) turns
-    # newlines into ";", so a heredoc line starting with gh is refused too; the message
-    # says to use a file.
+    # Walk the words. A separator, a pipe, a paren or a lone brace (and the reserved words
+    # that can lead a command) resets to command position; (z) turns newlines into ";", so
+    # a heredoc line starting with gh is refused too, and the message says to use a file.
+    # A redirect (>out, 2>&1, <<EOF) takes the next word as its target and leaves the
+    # command position alone, since `>out gh ...` still runs gh.
     local -a seps=(then do else elif if while until case esac in fi done function coproc repeat select foreach)
     local -a pre=(env xargs time nohup command exec builtin noglob nocorrect nice timeout sudo caffeinate coproc stdbuf)
-    local head=1 inpre=0 segcmd=''
+    local -a interp=(sh bash zsh dash ksh fish eval source .)
+    local head=1 inpre=0 ininterp=0 segcmd='' norm
     local assign='^[A-Za-z_][A-Za-z0-9_]*(\[[^]]*\])?\+?='
+    local textmsg="if gh is only text here, put the text in a file (e.g. git commit -F <file>)"
+    # Heredoc bodies are data, so they're dropped before the walk: a body line starting
+    # with *, # or gh is text. A body under an unquoted delimiter still expands, so its
+    # words keep the substitution check. Lines are split before quotes are parsed, so a
+    # multi-line string holding "<<X" can hide lines from this defence-in-depth pass; the
+    # command still isn't gh-led, so it runs sandboxed.
+    local line j
+    local -a kept hd hq lt
+    for line in "${(@f)cmd}"; do
+      if (( $#hd )); then
+        if [[ ${line##$'\t'#} == $hd[1] ]]; then shift hd; shift hq; continue; fi
+        if (( ! hq[1] )); then
+          for j in "${(@z)line}"; do
+            if has_expansion "$j" subst && [[ ${${j:l}//[\'\"\\]/} =~ $ghword ]]; then
+              no "no gh inside a substitution; $textmsg"; return 1
+            fi
+          done
+        fi
+        continue
+      fi
+      kept+=("$line")
+      lt=("${(@z)line}")
+      for (( j = 1; j < $#lt; j++ )); do
+        [[ $lt[j] == ('<<'|'<<-') ]] || continue
+        hd+=("${(Q)lt[j+1]}")
+        [[ $lt[j+1] == *[\'\"\\]* ]] && hq+=(1) || hq+=(0)
+      done
+    done
+    raw=("${(@z)${(F)kept}}")
+    val=("${(@Q)raw}")
     for (( i = 1; i <= $#raw; i++ )); do
-      if [[ $raw[i] == [\;\&\|\(\)\<\>\{\}\!]## || $raw[i] == <->[\<\>]* ]] || (( ${seps[(Ie)$raw[i]]} )); then
-        head=1 inpre=0; continue
+      # Defence in depth (the sandbox already stops these): gh text inside a substitution,
+      # or anywhere in a segment run by sh -c, eval or source. Quotes and backslashes are
+      # stripped first, so g""h and g\h still read as gh.
+      norm=${${raw[i]:l}//[\'\"\\]/}
+      if has_expansion "$raw[i]" subst && [[ $norm =~ $ghword ]]; then
+        no "no gh inside a substitution; $textmsg"; return 1
+      fi
+      if [[ $raw[i] == (<->|)[\<\>\&]##(\||\!|-|) && $raw[i] == *[\<\>]* ]]; then
+        (( i++ )); continue
+      fi
+      if [[ $raw[i] == [\;\&\|\(\)\{\}\!]## && $raw[i] != '{}' ]] || (( ${seps[(Ie)$raw[i]]} )); then
+        head=1 inpre=0 ininterp=0; continue
+      fi
+      if (( ininterp )); then
+        [[ $norm =~ $ghword ]] && { no "no gh inside $segcmd; $textmsg"; return 1 }
+        continue
       fi
       if (( head )); then
         [[ $raw[i] =~ $assign ]] && continue
-        head=0 segcmd=${val[i]:t}
-        (( ${pre[(Ie)$segcmd]} )) && inpre=1
+        head=0
       elif (( ! inpre )); then
         continue
       fi
-      # The command word, or any word after a wrapper precommand.
-      isgh "$val[i]" && { no "run gh as its own plain command: first word gh, nothing else on the line (if gh is only text here, put the text in a file, e.g. git commit -F <file>)"; return 1 }
-      has_expansion "$raw[i]" subst && { no "a command word or wrapper argument can't be a variable or substitution here: ${raw[i]}"; return 1 }
+      # The command word, or any word after a wrapper precommand (which may be the next
+      # command word: env time gh, env bash -c ...).
+      segcmd=${val[i]:t}
+      isgh "$val[i]" && { no "run gh as its own plain command: first word gh, nothing else on the line ($textmsg)"; return 1 }
+      has_expansion "$raw[i]" cmdword && { no "a command word or wrapper argument can't be a variable, substitution or glob here: ${raw[i]}"; return 1 }
+      (( ${pre[(Ie)$segcmd]} )) && inpre=1
+      (( ${interp[(Ie)$segcmd]} )) && { ininterp=1 inpre=0 }
     done
     return 0
   fi
 
-  # gh picks its repo from the working directory's git remote, so it may only run from
-  # the contract repo or one of its worktrees (same common git dir).
+  # gh picks its repo from the working directory's git remote, and its own git calls run
+  # unsandboxed with it. So the checkout must be the contract repo or one of its standard
+  # worktrees, with links checked as --tidy checks them, and its config must pass
+  # git_config_ok. A nested repo, or a .git file pointing at a planted gitdir, fails.
   local cwd
+  local -a g
   cwd=$(print -r -- "$input" | jq -r '.cwd // empty') || return 1
   [[ -n $cwd ]] || { no "gh: the hook input has no cwd"; return 1 }
-  find_git "$cwd" && [[ ${reply[2]:A} == ${root:A}/.git ]] \
+  find_git "$cwd" && g=("${reply[@]}") && [[ ${g[2]:A} == ${root:A}/.git ]] \
     || { no "gh runs only from ${root} or its worktrees, not $cwd"; return 1 }
+  if [[ -n ${g[3]-} ]]; then
+    [[ ${g[3]:h} == ${root:A}/.git/worktrees && -f ${g[3]}/gitdir && ! -e ${g[3]}/config.worktree \
+       && ${$(<${g[3]}/gitdir):A} == ${g[1]:A}/.git && $(<${g[3]}/commondir) == ../.. ]] \
+      || { no "gh: $cwd isn't a standard worktree of $root (its git links are nonstandard)"; return 1 }
+  fi
+  git_config_ok "${g[2]}" "${g[3]-}" || { no "gh: $root's git config holds keys outside the allowlist"; return 1 }
 
   for (( i = 2; i <= $#raw; i++ )); do
     has_expansion "$raw[i]" && { no "gh: no variables, substitutions, globs, braces or ~ outside single quotes: ${raw[i]}"; return 1 }
