@@ -88,17 +88,32 @@ find_git() {
 }
 
 # git_config_ok <common-gitdir> [per-tree-gitdir]: 0 when every key in its config files is
-# on cfg_ok_pat. Parses with `git config --file --no-includes` from /, which runs nothing.
+# on cfg_ok_pat. Parses with `git config --file --no-includes -z` from /, which runs nothing.
+# Two keys are data only for some values, so their values are checked too:
+#   - core.hookspath: only in the common config, and only pointing at its own hooks dir
+#     (MusicPortfolio sets it that way). Anywhere else it picks the hooks git runs.
+#   - remote.*.url|pushurl: only https://github.com/OWNER/REPO or git@github.com:OWNER/REPO.
+#     ext::, file paths and the like make a push or fetch run or write something else.
 git_config_ok() {
-  local f out k
+  local f out e k v
   local -a bad files=($1/config $1/config.worktree)
+  local url_re='^(https://github\.com/|git@github\.com:)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
   [[ -n ${2:-} ]] && files+=($2/config.worktree)
   for f in $files; do
     [[ -e $f || -L $f ]] || continue
     [[ -f $f && ! -L $f ]] || { print -u2 -r -- "autopilot: $f isn't a plain file"; return 1 }
-    out=$(cd / && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 command git config --file "$f" --no-includes --name-only --list) \
+    out=$(cd / && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 command git config --file "$f" --no-includes -z --list) \
       || { print -u2 -r -- "autopilot: can't parse $f"; return 1 }
-    for k in ${(f)out}; do [[ $k == ${~cfg_ok_pat} ]] || bad+=("$k ($f)"); done
+    for e in ${(ps:\0:)out}; do
+      k=${e%%$'\n'*}
+      [[ $e == *$'\n'* ]] && v=${e#*$'\n'} || v=''
+      if [[ $k != ${~cfg_ok_pat} ]]; then bad+=("$k ($f)")
+      elif [[ $k == core.hookspath ]]; then
+        [[ $f == $1/config && $v == /* && ${v:A} == ${1:A}/hooks ]] || bad+=("$k=$v ($f)")
+      elif [[ $k == remote.*.(url|pushurl) ]]; then
+        [[ $v =~ $url_re ]] || bad+=("$k=$v ($f)")
+      fi
+    done
   done
   (( $#bad )) || return 0
   print -u2 -r -- "autopilot: git config key(s) outside the allowlist: ${(j:, :)bad}"
@@ -121,8 +136,9 @@ git_config_ok() {
 #     Never "-" (stdin). A repo holding sandbox-read-denied files would need its own rule.
 # Claude Code reads any exit but 2 as "go ahead", so the guard runs in a subshell and only
 # an explicit pass exits 0.
-has_expansion() {  # <raw word>: 0 when the shell would expand something in it
-  local w=$1 c q='' i
+has_expansion() {  # <raw word> [notilde]: 0 when the shell would expand something in it
+  local w=$1 c q='' i tilde='~'
+  [[ ${2:-} == notilde ]] && tilde=''
   for (( i = 1; i <= $#w; i++ )); do
     c=$w[i]
     if [[ $q == "'" ]]; then [[ $c == "'" ]] && q=''; continue; fi
@@ -135,7 +151,8 @@ has_expansion() {  # <raw word>: 0 when the shell would expand something in it
     case $c in
       "'") q="'" ;;
       '"') q='"' ;;
-      '$'|'`'|'*'|'?'|'['|'~') return 0 ;;
+      '$'|'`'|'*'|'?'|'[') return 0 ;;
+      '~') [[ -n $tilde ]] && return 0 ;;
       '<'|'>') [[ ${w[i+1]-} == '(' ]] && return 0 ;;
     esac
   done
@@ -150,11 +167,14 @@ gh_guard() {
   # Pipes, not <<<: a here-string needs a temp file, and the hook may run without $TMPDIR.
   input=$(cat) || return 1
   cmd=$(print -r -- "$input" | jq -er '.tool_input.command | strings') || return 1
-  [[ $cmd == *gh* ]] || return 0
-  cwd=$(print -r -- "$input" | jq -r '.cwd // empty') || return 1
   local -a raw val roots
   raw=("${(@z)cmd}")
   val=("${(@Q)raw}")
+  # Fast path on the unquoted words too: g''h, g\h and "g"h hold no "gh" in the raw text.
+  # Anything with $ (ANSI $'...' quoting, variables) or a glob character (g? could match a
+  # file named gh) takes the full check.
+  [[ $cmd == *gh* || ${(j: :)val} == *gh* || $cmd == *[\$\*\?\[]* ]] || return 0
+  cwd=$(print -r -- "$input" | jq -r '.cwd // empty') || return 1
   # Plain variables: ${${:-/tmp/claude-$UID}:A} in an array garbles the "-" (zsh quirk).
   local tmp_uid=/tmp/claude-$UID tmp_shared=/tmp/claude
   roots=(${root:A} ${tmp_uid:A} ${tmp_shared:A})
@@ -167,17 +187,24 @@ gh_guard() {
     # word of a segment led by a precommand. A gh word that's only an argument (a commit
     # message, a grep pattern) is fine, except inside a substitution, which can't be told
     # apart from text cheaply: there the message says to use a file instead.
-    local -a seps=(';' '&&' '||' '|' '|&' '&' '&!' '&|' '(' ')' '{' '}' '!' then do else elif if while until)
-    local -a pre=(env xargs time nohup command exec builtin noglob nocorrect nice timeout sudo caffeinate)
+    # Any operator-only token (separators, pipes, redirects, parens, braces) resets to command
+    # position, as do the reserved words that can lead a command. (z) turns newlines into ";".
+    local -a seps=(then do else elif if while until case esac in fi done function coproc repeat select foreach)
+    local -a pre=(env xargs time nohup command exec builtin noglob nocorrect nice timeout sudo caffeinate coproc)
     local head=1 inpre=0
     for (( i = 1; i <= $#raw; i++ )); do
-      if (( ${seps[(Ie)$raw[i]]} )); then head=1 inpre=0; continue; fi
+      if [[ $raw[i] == [\;\&\|\(\)\<\>\{\}\!]## || $raw[i] == <->[\<\>]* ]] || (( ${seps[(Ie)$raw[i]]} )); then
+        head=1 inpre=0; continue
+      fi
       if has_expansion "$raw[i]" && [[ $raw[i] =~ $ghword ]]; then
         no "no gh inside a substitution or variable; if gh is only text here, put the text in a file (git commit -F <file>)"; return 1
       fi
       if (( head )); then
         [[ $raw[i] =~ '^[A-Za-z_][A-Za-z0-9_]*=' ]] && continue
         head=0
+        # A command word that the shell expands ($X, $'..', $(..), or a glob like g? that
+        # could match a file named gh) could be gh in disguise. A leading ~ is fine.
+        has_expansion "$raw[i]" notilde && { no "the command word can't be a variable, substitution or glob here: ${raw[i]}"; return 1 }
         (( ${pre[(Ie)$val[i]]} )) && inpre=1
       elif (( ! inpre )); then
         continue
@@ -333,10 +360,12 @@ rule_ok() {
       [[ $lit == $repo_dir/* ]] || return 1
       rel=${lit#$repo_dir/}
       comps=(${(s:/:)rel}) p=$repo_dir
+      # Lowercased: macOS volumes are case-insensitive, so .CLAUDE is .claude on disk. The one
+      # exception must be spelled exactly .claude/worktrees.
       for (( i = 1; i <= $#comps; i++ )); do
-        case $comps[i] in
+        case ${comps[i]:l} in
           (.git|.mcp.json) return 1 ;;
-          (.claude) (( i == 1 )) && [[ ${comps[2]-} == worktrees ]] || return 1 ;;
+          (.claude) (( i == 1 )) && [[ $comps[1] == .claude && ${comps[2]-} == worktrees ]] || return 1 ;;
         esac
       done
       for comp in $comps; do
@@ -353,11 +382,23 @@ for r in $allow; do
 done
 # Inside a "/**" subtree, deny what rule_ok refuses at its top: .git, .claude/ and .mcp.json
 # at any depth. Deny beats allow in Claude Code, and the ~/ form matches the allow rule's.
+# Each name also gets a [cC]-class spelling, since macOS volumes are case-insensitive and
+# whether Claude Code's matcher folds case is unverified. A class the matcher didn't support
+# would match nothing, so the plain spelling stays too.
+anycase() { local s=$1 o='' c; for c in ${(s::)s}; do [[ $c == [a-z] ]] && o+="[$c${(U)c}]" || o+=$c; done; print -r -- $o }
 typeset -a deny
 for r in $allow; do
   [[ $r == 'Edit('*'/**)' ]] || continue
   p=${${r#Edit\(}%/\*\*\)}
-  deny+=("Edit($p/**/.git)" "Edit($p/**/.git/**)" "Edit($p/**/.claude/**)" "Edit($p/**/.mcp.json)")
+  for n in .git .claude .mcp.json; do
+    for s in $n $(anycase $n); do
+      case $n in
+        (.git) deny+=("Edit($p/**/$s)" "Edit($p/**/$s/**)") ;;
+        (.claude) deny+=("Edit($p/**/$s/**)") ;;
+        (.mcp.json) deny+=("Edit($p/**/$s)") ;;
+      esac
+    done
+  done
 done
 # The devlog sits outside the repo, so the run needs an explicit write rule for it. The
 # launcher adds it itself; the contract can't.
