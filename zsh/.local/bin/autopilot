@@ -17,8 +17,8 @@
 #     hooks, and those run unsandboxed. Deny beats allow.
 #   - The run's --settings carry a PreToolUse hook, `autopilot --hook-gh <repo>`
 #     (gh_guard). gh is sandbox-excluded, so a gh command the allow rules let through runs
-#     unsandboxed with the owner's token. The guard keeps gh to this repo, to a few
-#     subcommands, and to body files the sandbox could read anyway. It fails closed:
+#     unsandboxed with the owner's token. The guard keeps gh to this repo and to a few
+#     subcommands and flags, with bodies inline (no --body-file). It fails closed:
 #     anything but an explicit pass exits 2.
 #   - All git here runs from the owner's unsandboxed terminal, so it goes through sgit (no
 #     global or system config, fsmonitor and hooks off) and only after git_config_ok has
@@ -123,22 +123,28 @@ git_config_ok() {
 # ---- --hook-gh: PreToolUse guard for gh in an autopilot run ----------------------------
 # gh runs unsandboxed (sandbox.excludedCommands), so a gh command the run's allow rules let
 # through can reach other repos and read files the sandbox denies. Rules:
-#   - gh runs only as one plain command: first word gh, and no other command, separator,
-#     redirect, substitution or variable anywhere in it. A gh word elsewhere in a command
-#     (after a separator, in $(...), after env/xargs/time) is refused outright. gh only
-#     works alone anyway, since a companion command sandboxes the call.
-#   - Subcommands: pr create|edit|comment|checks|view|list|diff|ready, issue edit|view|list,
-#     run view|list, release view|list, auth status.
-#   - No --repo/-R, no URL or OWNER/REPO#N argument outside a --body/--title value, and
-#     short flags one at a time (-b x, not -bx or -dR).
-#   - --body-file/-F: a plain path (no quotes, globs or variables) to a regular file with
-#     one link, inside the repo or the sandbox temp dirs (/tmp/claude, /tmp/claude-<uid>).
-#     Never "-" (stdin). A repo holding sandbox-read-denied files would need its own rule.
+#   - gh runs only as one plain command: first word gh (lowercase, unquoted), and no
+#     separator, redirect, substitution, variable, glob, brace or ~ in it.
+#   - gh in command position anywhere else is refused: after a separator, after a
+#     precommand like env/xargs/time, in $(...), and spelled GH, g''h or =gh (macOS and the
+#     shell turn each of those into gh). So is gh text inside sh -c, eval or source. Other
+#     interpreters (python -c ...) rely on the permission rules, and on the sandbox, where
+#     gh can't do TLS.
+#   - Per subcommand, only the flags in ghflags. That leaves out --repo/-R, --web, --editor,
+#     --recover, --show-token and --body-file/-F. A body file could be swapped for a
+#     symlink after this check and before gh opens it, so bodies go inline: --body '...'
+#     in single quotes, newlines and all. A multi-line gh call still runs unsandboxed and
+#     matches the allow rules (probed 2026-11-24).
+#   - No URL or OWNER/REPO#N positional: targets are numbers or branches in this repo.
 # Claude Code reads any exit but 2 as "go ahead", so the guard runs in a subshell and only
-# an explicit pass exits 0.
-has_expansion() {  # <raw word> [notilde]: 0 when the shell would expand something in it
-  local w=$1 c q='' i tilde='~'
-  [[ ${2:-} == notilde ]] && tilde=''
+# an explicit pass exits 0. On 2026-11-24 it blocked -R and g''h in a headless session
+# with the music-platform settings, and -R in an isolation-worktree subagent of it, while
+# a plain `gh pr view` went through.
+has_expansion() {  # <raw word> [cmdword]: 0 when the shell would expand something in it
+  # cmdword: a leading "~/" (a home-relative path) is fine there; any other ~ isn't.
+  # =word at the start is zsh's command-path expansion (=gh is /opt/homebrew/bin/gh);
+  # ^ and # are globs under extended_glob.
+  local w=$1 c q='' i cmdword=${2:-}
   for (( i = 1; i <= $#w; i++ )); do
     c=$w[i]
     if [[ $q == "'" ]]; then [[ $c == "'" ]] && q=''; continue; fi
@@ -149,11 +155,12 @@ has_expansion() {  # <raw word> [notilde]: 0 when the shell would expand somethi
       continue
     fi
     case $c in
-      "'") q="'" ;;
-      '"') q='"' ;;
-      '$'|'`'|'*'|'?'|'[') return 0 ;;
-      '~') [[ -n $tilde ]] && return 0 ;;
-      '<'|'>') [[ ${w[i+1]-} == '(' ]] && return 0 ;;
+      ("'") q="'" ;;
+      ('"') q='"' ;;
+      ('$'|'`'|'*'|'?'|'['|'{'|'}'|'^'|'#') return 0 ;;
+      ('=') (( i == 1 )) && return 0 ;;
+      ('~') [[ -n $cmdword ]] && (( i == 1 )) && [[ ${w[2]-} == / ]] || return 0 ;;
+      ('<'|'>') [[ ${w[i+1]-} == '(' ]] && return 0 ;;
     esac
   done
   return 1
@@ -162,101 +169,101 @@ has_expansion() {  # <raw word> [notilde]: 0 when the shell would expand somethi
 gh_guard() {
   emulate -L zsh
   setopt extended_glob
-  zmodload -F zsh/stat b:zstat || return 1
-  local root=${1:?} input cmd cwd
+  local root=${1:?} input cmd
   # Pipes, not <<<: a here-string needs a temp file, and the hook may run without $TMPDIR.
   input=$(cat) || return 1
   cmd=$(print -r -- "$input" | jq -er '.tool_input.command | strings') || return 1
-  local -a raw val roots
+  # No fast path: every command is tokenized. Each shortcut tried here had a bypass.
+  local -a raw val
   raw=("${(@z)cmd}")
   val=("${(@Q)raw}")
-  # Fast path on the unquoted words too: g''h, g\h and "g"h hold no "gh" in the raw text.
-  # Anything with $ (ANSI $'...' quoting, variables) or a glob character (g? could match a
-  # file named gh) takes the full check.
-  [[ $cmd == *gh* || ${(j: :)val} == *gh* || $cmd == *[\$\*\?\[]* ]] || return 0
-  cwd=$(print -r -- "$input" | jq -r '.cwd // empty') || return 1
-  # Plain variables: ${${:-/tmp/claude-$UID}:A} in an array garbles the "-" (zsh quirk).
-  local tmp_uid=/tmp/claude-$UID tmp_shared=/tmp/claude
-  roots=(${root:A} ${tmp_uid:A} ${tmp_shared:A})
-  local ghword='(^|[^A-Za-z0-9_.-])gh([^A-Za-z0-9_.-]|$)'
+  local ghword='(^|[^a-z0-9_.-])gh([^a-z0-9_.-]|$)'  # matched against lowercased text
   local i
   no() { print -u2 -r -- "autopilot guard: $*"; return 1 }
+  isgh() { [[ ${1:l} == gh || ${1:l} == */gh ]] }
 
   if [[ $raw[1] != gh ]]; then
-    # gh in command position anywhere: a segment's first word (after assignments), or any
-    # word of a segment led by a precommand. A gh word that's only an argument (a commit
-    # message, a grep pattern) is fine, except inside a substitution, which can't be told
-    # apart from text cheaply: there the message says to use a file instead.
-    # Any operator-only token (separators, pipes, redirects, parens, braces) resets to command
-    # position, as do the reserved words that can lead a command. (z) turns newlines into ";".
+    # Any operator-only token (separators, pipes, redirects, parens, braces) resets to
+    # command position, as do the reserved words that can lead a command. (z) turns
+    # newlines into ";". A gh word that's only an argument (a commit message, a grep
+    # pattern) is fine, except inside a substitution, which can't be told apart from text
+    # cheaply: there the message says to use a file instead.
     local -a seps=(then do else elif if while until case esac in fi done function coproc repeat select foreach)
     local -a pre=(env xargs time nohup command exec builtin noglob nocorrect nice timeout sudo caffeinate coproc)
-    local head=1 inpre=0
+    local -a interp=(sh bash zsh dash ksh fish eval source .)
+    local head=1 seg='' segcmd=''
     for (( i = 1; i <= $#raw; i++ )); do
       if [[ $raw[i] == [\;\&\|\(\)\<\>\{\}\!]## || $raw[i] == <->[\<\>]* ]] || (( ${seps[(Ie)$raw[i]]} )); then
-        head=1 inpre=0; continue
+        head=1 seg=''; continue
       fi
-      if has_expansion "$raw[i]" && [[ $raw[i] =~ $ghword ]]; then
+      if has_expansion "$raw[i]" && [[ ${raw[i]:l} =~ $ghword ]]; then
         no "no gh inside a substitution or variable; if gh is only text here, put the text in a file (git commit -F <file>)"; return 1
       fi
       if (( head )); then
         [[ $raw[i] =~ '^[A-Za-z_][A-Za-z0-9_]*=' ]] && continue
-        head=0
-        # A command word that the shell expands ($X, $'..', $(..), or a glob like g? that
-        # could match a file named gh) could be gh in disguise. A leading ~ is fine.
-        has_expansion "$raw[i]" notilde && { no "the command word can't be a variable, substitution or glob here: ${raw[i]}"; return 1 }
-        (( ${pre[(Ie)$val[i]]} )) && inpre=1
-      elif (( ! inpre )); then
+        head=0 segcmd=${val[i]:t}
+        has_expansion "$raw[i]" cmdword && { no "the command word can't be a variable, substitution, glob or brace here: ${raw[i]}"; return 1 }
+        isgh "$val[i]" && { no "run gh as its own plain command: first word gh, nothing else on the line"; return 1 }
+        (( ${pre[(Ie)$segcmd]} )) && seg=pre
+        (( ${interp[(Ie)$segcmd]} )) && seg=interp
         continue
       fi
-      [[ $val[i] == gh || $val[i] == */gh ]] && { no "run gh as its own plain command: first word gh, nothing else on the line"; return 1 }
+      case $seg in
+        (pre)
+          has_expansion "$raw[i]" && { no "no variables, substitutions, globs or braces in the arguments of $segcmd: ${raw[i]}"; return 1 }
+          isgh "$val[i]" && { no "run gh as its own plain command: first word gh, nothing else on the line"; return 1 } ;;
+        (interp)
+          [[ ${val[i]:l} =~ $ghword ]] && { no "no gh inside $segcmd"; return 1 } ;;
+      esac
     done
     return 0
   fi
 
   for (( i = 2; i <= $#raw; i++ )); do
-    has_expansion "$raw[i]" && { no "gh: no variables, globs, ~ or substitutions outside single quotes: ${raw[i]}"; return 1 }
+    has_expansion "$raw[i]" && { no "gh: no variables, substitutions, globs, braces or ~ outside single quotes: ${raw[i]}"; return 1 }
     [[ $raw[i] == [\;\&\|\(\)\{\}\<\>]* || $raw[i] == <->[\<\>]* ]] && { no "gh runs alone: no separators, pipes or redirects (${raw[i]})"; return 1 }
   done
-  case "${val[2]-} ${val[3]-}" in
-    ('pr '(create|edit|comment|checks|view|list|diff|ready)|'issue '(edit|view|list)|'run '(view|list)|'release '(view|list)|'auth status') ;;
-    (*) no "gh ${val[2]-} ${val[3]-} isn't allowed in an autopilot run"; return 1 ;;
-  esac
 
-  body_file_ok() {  # <value> <raw>
-    local v=$1 r=$2 p real rt
-    local -a nl
-    [[ -n $v && $v != - ]] || { no "--body-file needs a file, not stdin"; return 1 }
-    [[ $r =~ '^[A-Za-z0-9_./+@%,:=-]+$' ]] || { no "--body-file: write the path plainly (no quotes, ~, globs or variables)"; return 1 }
-    p=$v
-    [[ $p == /* ]] || p=$cwd/$p
-    real=${p:A}
-    [[ -f $real ]] || { no "--body-file $v: not a regular file"; return 1 }
-    zstat -A nl +nlink -- $real || return 1
-    (( nl[1] == 1 )) || { no "--body-file $v: has ${nl[1]} hard links"; return 1 }
-    for rt in $roots; do [[ $real == $rt/* ]] && return 0; done
-    no "--body-file $v resolves to $real, outside the repo and the sandbox temp dirs"
-  }
-  target_ok() {  # <value>: refuse a selector that names another repo
+  # The flags a run may pass, per subcommand. "=" marks one that takes a value.
+  local -A ghflags=(
+    'pr create'    '--title= -t= --body= -b= --base= -B= --head= -H= --draft -d --label= -l= --assignee= -a= --reviewer= -r= --milestone= -m= --fill --fill-first --fill-verbose --no-maintainer-edit'
+    'pr edit'      '--title= -t= --body= -b= --base= -B= --add-label= --remove-label= --add-reviewer= --remove-reviewer= --add-assignee= --remove-assignee= --milestone= -m= --remove-milestone'
+    'pr comment'   '--body= -b= --edit-last --create-if-none'
+    'pr checks'    '--watch --fail-fast --interval= -i= --required --json= --jq= -q= --template= -t='
+    'pr view'      '--comments -c --json= --jq= -q= --template= -t='
+    'pr list'      '--state= -s= --limit= -L= --label= -l= --author= -A= --assignee= -a= --base= -B= --head= -H= --search= -S= --draft -d --json= --jq= -q= --template= -t='
+    'pr diff'      '--name-only --patch --color='
+    'pr ready'     '--undo'
+    'issue edit'   '--title= -t= --body= -b= --add-label= --remove-label= --add-assignee= --remove-assignee= --milestone= -m= --remove-milestone'
+    'issue view'   '--comments -c --json= --jq= -q= --template= -t='
+    'issue list'   '--state= -s= --limit= -L= --label= -l= --author= -A= --assignee= -a= --search= -S= --milestone= -m= --mention= --json= --jq= -q= --template= -t='
+    'run view'     '--log --log-failed --job= -j= --attempt= -a= --exit-status --verbose -v --json= --jq= -q= --template= -t='
+    'run list'     '--limit= -L= --workflow= -w= --branch= -b= --status= -s= --event= -e= --user= -u= --commit= -c= --created= --json= --jq= -q= --template= -t='
+    'release view' '--json= --jq= -q= --template= -t='
+    'auth status'  ''
+  )
+  local sub="${val[2]-} ${val[3]-}"
+  (( ${+ghflags[$sub]} )) || { no "gh $sub isn't allowed in an autopilot run"; return 1 }
+  local -a okf=(${=ghflags[$sub]})
+  target_ok() {  # <positional>: refuse a selector that names another repo
     [[ $1 == *://* || $1 == (#i)*github.com* || $1 == [^/]##/[^/]##\#* ]] \
       && { no "gh: no URL or OWNER/REPO targets ($1); use the number in this repo"; return 1 }
     return 0
   }
-
   local v opts=1
   for (( i = 4; i <= $#val; i++ )); do
     v=$val[i]
-    if (( ! opts )); then target_ok "$v" || return 1; continue; fi
+    if (( ! opts )) || [[ $v != -?* ]]; then target_ok "$v" || return 1; continue; fi
     case $v in
-      (--) opts=0 ;;
-      (--repo|--repo=*|-R*) no "gh: no --repo/-R; an autopilot run stays on its own repo"; return 1 ;;
-      (--body-file|-F) (( i++ )); body_file_ok "${val[i]-}" "${raw[i]-}" || return 1 ;;
-      (--body-file=*) body_file_ok "${v#--body-file=}" "${raw[i]#--body-file=}" || return 1 ;;
-      (--body|-b|--title|-t) (( i++ )) ;;
-      (--*) ;;
-      (-?) ;;
-      (-?*) no "gh: give short flags one at a time with a separate value ($v)"; return 1 ;;
-      (*) target_ok "$v" || return 1 ;;
+      (--) opts=0; continue ;;
+      (--repo|--repo=*|-R|-R?*) no "gh: no --repo/-R; an autopilot run stays on its own repo"; return 1 ;;
+      (--body-file|--body-file=*|-F|-F?*) no "gh: no --body-file/-F (the file could be swapped after this check); pass the text inline as --body '...' in single quotes, newlines and all"; return 1 ;;
+      (--*=*)
+        (( ${okf[(Ie)${v%%=*}=]} )) || { no "gh $sub: ${v%%=*} isn't an allowed flag here"; return 1 } ;;
+      (--*|-?)
+        if (( ${okf[(Ie)$v=]} )); then (( i++ ))
+        elif (( ! ${okf[(Ie)$v]} )); then no "gh $sub: $v isn't an allowed flag here"; return 1; fi ;;
+      (*) no "gh: give short flags one at a time with a separate value ($v)"; return 1 ;;
     esac
   done
   return 0
