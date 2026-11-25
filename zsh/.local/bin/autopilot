@@ -218,35 +218,15 @@ gh_guard() {
     local head=1 inpre=0 ininterp=0 segcmd='' norm
     local assign='^[A-Za-z_][A-Za-z0-9_]*(\[[^]]*\])?\+?='
     local textmsg="if gh is only text here, put the text in a file (e.g. git commit -F <file>)"
-    # Heredoc bodies are data, so they're dropped before the walk: a body line starting
-    # with *, # or gh is text. A body under an unquoted delimiter still expands, so its
-    # words keep the substitution check. Lines are split before quotes are parsed, so a
-    # multi-line string holding "<<X" can hide lines from this defence-in-depth pass; the
-    # command still isn't gh-led, so it runs sandboxed.
-    local line j
-    local -a kept hd hq lt
-    for line in "${(@f)cmd}"; do
-      if (( $#hd )); then
-        if [[ ${line##$'\t'#} == $hd[1] ]]; then shift hd; shift hq; continue; fi
-        if (( ! hq[1] )); then
-          for j in "${(@z)line}"; do
-            if has_expansion "$j" subst && [[ ${${j:l}//[\'\"\\]/} =~ $ghword ]]; then
-              no "no gh inside a substitution; $textmsg"; return 1
-            fi
-          done
-        fi
-        continue
-      fi
-      kept+=("$line")
-      lt=("${(@z)line}")
-      for (( j = 1; j < $#lt; j++ )); do
-        [[ $lt[j] == ('<<'|'<<-') ]] || continue
-        hd+=("${(Q)lt[j+1]}")
-        [[ $lt[j+1] == *[\'\"\\]* ]] && hq+=(1) || hq+=(0)
-      done
-    done
-    raw=("${(@z)${(F)kept}}")
-    val=("${(@Q)raw}")
+    # Heredocs: nothing is ever dropped from the walk. A pass that removed body lines let
+    # `# <<X` hide a real gh line below it. Instead, from the first ";" (a newline, or a
+    # literal ";") after a <<DELIM until a line holding only DELIM, the walk is "in a
+    # body": the command-word check there drops its glob part, so a "* item" or "[link]"
+    # line passes, but isgh still applies. So a body line starting with gh is refused, and
+    # the message says to use a file. Getting the body boundary wrong only ever checks
+    # more, never less.
+    local -a hd
+    local inbody=0
     for (( i = 1; i <= $#raw; i++ )); do
       # Defence in depth (the sandbox already stops these): gh text inside a substitution,
       # or anywhere in a segment run by sh -c, eval or source. Quotes and backslashes are
@@ -256,10 +236,17 @@ gh_guard() {
         no "no gh inside a substitution; $textmsg"; return 1
       fi
       if [[ $raw[i] == (<->|)[\<\>\&]##(\||\!|-|) && $raw[i] == *[\<\>]* ]]; then
+        [[ $raw[i] == (<->|)('<<'|'<<-') ]] && hd+=("${(Q)raw[i+1]-}")
         (( i++ )); continue
       fi
       if [[ $raw[i] == [\;\&\|\(\)\{\}\!]## && $raw[i] != '{}' ]] || (( ${seps[(Ie)$raw[i]]} )); then
+        [[ $raw[i] == ';' ]] && (( $#hd )) && inbody=1
         head=1 inpre=0 ininterp=0; continue
+      fi
+      # A body's closing line: only the delimiter, then a newline or the end.
+      if (( inbody && head )) && [[ $val[i] == ${hd[1]-} && ( $i -eq $#raw || ${raw[i+1]} == ';' ) ]]; then
+        shift hd; (( $#hd )) || inbody=0
+        continue
       fi
       if (( ininterp )); then
         [[ $norm =~ $ghword ]] && { no "no gh inside $segcmd; $textmsg"; return 1 }
@@ -275,7 +262,10 @@ gh_guard() {
       # command word: env time gh, env bash -c ...).
       segcmd=${val[i]:t}
       isgh "$val[i]" && { no "run gh as its own plain command: first word gh, nothing else on the line ($textmsg)"; return 1 }
-      has_expansion "$raw[i]" cmdword && { no "a command word or wrapper argument can't be a variable, substitution or glob here: ${raw[i]}"; return 1 }
+      local wmode=cmdword
+      (( inbody )) && wmode=subst
+      has_expansion "$raw[i]" $wmode \
+        && { no "a command word or wrapper argument can't be a variable, substitution or glob here: ${raw[i]}"; return 1 }
       (( ${pre[(Ie)$segcmd]} )) && inpre=1
       (( ${interp[(Ie)$segcmd]} )) && { ininterp=1 inpre=0 }
     done
