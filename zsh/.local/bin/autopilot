@@ -225,8 +225,19 @@ gh_guard() {
     # line passes, but isgh still applies. So a body line starting with gh is refused, and
     # the message says to use a file. Getting the body boundary wrong only ever checks
     # more, never less.
-    local -a hd
-    local inbody=0
+    # Body mode starts only at a real newline, never at a literal ";" (`cat <<X; g? ...`
+    # keeps g? a command word). (z) writes both as ";", and (Z+n+) drops only the
+    # newline ones, so lining the two up marks which is which. If they ever diverge
+    # otherwise, no ";" counts as a newline and body mode is never entered.
+    local -a hd rawn=("${(@Z+n+)cmd}")
+    local -A fromnl
+    local inbody=0 headnl=1 k=1
+    for (( i = 1; i <= $#raw; i++ )); do
+      if [[ $raw[i] == ${rawn[k]-} ]]; then (( k++ ))
+      elif [[ $raw[i] == ';' ]]; then fromnl[$i]=1
+      else fromnl=(); break
+      fi
+    done
     for (( i = 1; i <= $#raw; i++ )); do
       # Defence in depth (the sandbox already stops these): gh text inside a substitution,
       # or anywhere in a segment run by sh -c, eval or source. Quotes and backslashes are
@@ -240,11 +251,12 @@ gh_guard() {
         (( i++ )); continue
       fi
       if [[ $raw[i] == [\;\&\|\(\)\{\}\!]## && $raw[i] != '{}' ]] || (( ${seps[(Ie)$raw[i]]} )); then
-        [[ $raw[i] == ';' ]] && (( $#hd )) && inbody=1
+        headnl=${+fromnl[$i]}
+        (( headnl && $#hd )) && inbody=1
         head=1 inpre=0 ininterp=0; continue
       fi
-      # A body's closing line: only the delimiter, then a newline or the end.
-      if (( inbody && head )) && [[ $val[i] == ${hd[1]-} && ( $i -eq $#raw || ${raw[i+1]} == ';' ) ]]; then
+      # A body's closing line: only the delimiter, on a line of its own.
+      if (( inbody && head && headnl )) && [[ $val[i] == ${hd[1]-} ]] && (( i == $#raw || ${+fromnl[$((i+1))]} )); then
         shift hd; (( $#hd )) || inbody=0
         continue
       fi
