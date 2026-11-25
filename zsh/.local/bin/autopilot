@@ -10,7 +10,21 @@
 #     it never waits on a prompt; anything that would prompt is refused and logged.
 #   - The extra allow rules also live only in this run's --settings, never in settings.json.
 #   - Contract allow rules must pass rule_ok, an allowlist (gh pr|issue subcommands; Edit
-#     of a plain path inside the repo), or the run doesn't start.
+#     of a plain path inside the repo, with no .git, .mcp.json or nested .claude component),
+#     or the run doesn't start.
+#   - Each Edit(.../**) rule gets deny rules for the .git, .claude/ and .mcp.json inside its
+#     subtree. A worktree under .claude/worktrees has its own .claude/settings.json and
+#     hooks, and those run unsandboxed. Deny beats allow.
+#   - The run's --settings carry a PreToolUse hook, `autopilot --hook-gh <repo>`
+#     (gh_guard). gh is sandbox-excluded, so a gh command the allow rules let through runs
+#     unsandboxed with the owner's token. The guard keeps gh to this repo, to a few
+#     subcommands, and to body files the sandbox could read anyway. It fails closed:
+#     anything but an explicit pass exits 2.
+#   - All git here runs from the owner's unsandboxed terminal, so it goes through sgit (no
+#     global or system config, fsmonitor and hooks off) and only after git_config_ok has
+#     checked the repo's config against an allowlist. Other repos' .git dirs are
+#     sandbox-writable from sessions rooted elsewhere; on 2026-11-24 a dotfiles session could
+#     open MusicPortfolio/.git/config and .git/hooks for writing.
 #   - --tidy removes only trees autopilot registered (notes start "autopilot") whose PR is
 #     merged or closed, and only when the tree is clean and its HEAD is the PR's last head.
 #     The registry is sandbox-writable, so the tree must also be a real worktree of the
@@ -20,10 +34,11 @@
 #     sandbox keeps it from removing the tree). GitHub's PR state still decides; an existing
 #     merged_at/abandoned_at is kept, otherwise the stamp is GitHub's merge or close time.
 #     Rows whose notes don't start "autopilot" are never taken, whatever their status.
-#   - --tidy runs git outside the sandbox in trees a sandboxed session used, so it first
-#     checks the tree's git links (.git file, gitdir, commondir, no config.worktree) and
-#     then runs git with fsmonitor and hooks off. A planted commondir pointing at a config
-#     with core.fsmonitor ran its command under a plain `git -C <tree> status` (tested).
+#   - --tidy runs git in trees a sandboxed session used, so it first checks the tree's git
+#     links (.git file, gitdir, commondir, no config.worktree). A planted commondir pointing
+#     at a config with core.fsmonitor ran its command under a plain `git -C <tree> status`
+#     (tested). Its status ignores submodules, because a gitlink in a planted index would
+#     make status recurse into a nested repo whose config the session wrote.
 #     It runs from the owner's terminal: a sandboxed session can't write .git/worktrees.
 # gotchas:
 #   - The contract parser handles only this flat shape: `key: value` lines and an `allow:`
@@ -31,8 +46,200 @@
 #   - caffeinate keeps the Mac awake on its own, but not with the lid closed on battery.
 #   - Never name a variable `path` here: zsh ties it to $PATH (first dry run lost awk and jq).
 #   - Starting the same repo twice runs two sessions on it. Check `claude agents` first.
+#   - git_config_ok refuses any repo config key outside its allowlist. A new kind of key in
+#     a contract repo (a submodule, lfs, a VS Code branch key) stops the run with the key's
+#     name; widen cfg_ok_pat deliberately.
+#   - The hook runs on every Bash call in the run, so keep its fast path (no "gh" in the
+#     command) cheap.
 # last-touched: 2026-11-24
 # ---
+
+self=${0:A}
+
+# ---- git a sandboxed session can't steer -----------------------------------------------
+# -c overrides can't neutralize every exec-capable key (a filter driver plus
+# .git/info/attributes, for one), so git_config_ok's allowlist is the real defence and sgit
+# is belt and braces. Data keys only: nothing on the list names a command, filter or hook.
+cfg_ok_pat='(core.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|hookspath)|extensions.(worktreeconfig|objectformat|refstorage)|remote.*.(url|pushurl|fetch|gh-resolved|prune|tagopt)|branch.*.(remote|merge|rebase|pushremote|description|vscode-merge-base)|lfs.repositoryformatversion|user.(name|email)|pull.(rebase|ff)|push.(default|autosetupremote)|fetch.prune|init.defaultbranch)'
+
+sgit() {
+  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 \
+    command git --no-pager -c core.fsmonitor=false -c core.hooksPath=/dev/null "$@"
+}
+
+# find_git <dir>: reply=(top common-gitdir [per-tree-gitdir]) for the checkout holding dir.
+# Reads the .git links itself, so no git runs before git_config_ok.
+find_git() {
+  local d=${1:A} link c
+  reply=()
+  while :; do
+    if [[ -L $d/.git ]]; then return 1
+    elif [[ -d $d/.git ]]; then reply=($d $d/.git); return 0
+    elif [[ -f $d/.git ]]; then
+      link=$(<$d/.git); link=${link#gitdir: }
+      [[ $link == /* ]] || link=$d/$link
+      [[ -d $link && -f $link/commondir ]] || return 1
+      c=$(<$link/commondir); [[ $c == /* ]] || c=$link/$c
+      reply=($d ${c:A} ${link:A}); return 0
+    fi
+    [[ $d == / ]] && return 1
+    d=${d:h}
+  done
+}
+
+# git_config_ok <common-gitdir> [per-tree-gitdir]: 0 when every key in its config files is
+# on cfg_ok_pat. Parses with `git config --file --no-includes` from /, which runs nothing.
+git_config_ok() {
+  local f out k
+  local -a bad files=($1/config $1/config.worktree)
+  [[ -n ${2:-} ]] && files+=($2/config.worktree)
+  for f in $files; do
+    [[ -e $f || -L $f ]] || continue
+    [[ -f $f && ! -L $f ]] || { print -u2 -r -- "autopilot: $f isn't a plain file"; return 1 }
+    out=$(cd / && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 command git config --file "$f" --no-includes --name-only --list) \
+      || { print -u2 -r -- "autopilot: can't parse $f"; return 1 }
+    for k in ${(f)out}; do [[ $k == ${~cfg_ok_pat} ]] || bad+=("$k ($f)"); done
+  done
+  (( $#bad )) || return 0
+  print -u2 -r -- "autopilot: git config key(s) outside the allowlist: ${(j:, :)bad}"
+  return 1
+}
+
+# ---- --hook-gh: PreToolUse guard for gh in an autopilot run ----------------------------
+# gh runs unsandboxed (sandbox.excludedCommands), so a gh command the run's allow rules let
+# through can reach other repos and read files the sandbox denies. Rules:
+#   - gh runs only as one plain command: first word gh, and no other command, separator,
+#     redirect, substitution or variable anywhere in it. A gh word elsewhere in a command
+#     (after a separator, in $(...), after env/xargs/time) is refused outright. gh only
+#     works alone anyway, since a companion command sandboxes the call.
+#   - Subcommands: pr create|edit|comment|checks|view|list|diff|ready, issue edit|view|list,
+#     run view|list, release view|list, auth status.
+#   - No --repo/-R, no URL or OWNER/REPO#N argument outside a --body/--title value, and
+#     short flags one at a time (-b x, not -bx or -dR).
+#   - --body-file/-F: a plain path (no quotes, globs or variables) to a regular file with
+#     one link, inside the repo or the sandbox temp dirs (/tmp/claude, /tmp/claude-<uid>).
+#     Never "-" (stdin). A repo holding sandbox-read-denied files would need its own rule.
+# Claude Code reads any exit but 2 as "go ahead", so the guard runs in a subshell and only
+# an explicit pass exits 0.
+has_expansion() {  # <raw word>: 0 when the shell would expand something in it
+  local w=$1 c q='' i
+  for (( i = 1; i <= $#w; i++ )); do
+    c=$w[i]
+    if [[ $q == "'" ]]; then [[ $c == "'" ]] && q=''; continue; fi
+    if [[ $c == '\' ]]; then (( i++ )); continue; fi
+    if [[ $q == '"' ]]; then
+      [[ $c == '"' ]] && { q=''; continue }
+      [[ $c == '$' || $c == '`' ]] && return 0
+      continue
+    fi
+    case $c in
+      "'") q="'" ;;
+      '"') q='"' ;;
+      '$'|'`'|'*'|'?'|'['|'~') return 0 ;;
+      '<'|'>') [[ ${w[i+1]-} == '(' ]] && return 0 ;;
+    esac
+  done
+  return 1
+}
+
+gh_guard() {
+  emulate -L zsh
+  setopt extended_glob
+  zmodload -F zsh/stat b:zstat || return 1
+  local root=${1:?} input cmd cwd
+  # Pipes, not <<<: a here-string needs a temp file, and the hook may run without $TMPDIR.
+  input=$(cat) || return 1
+  cmd=$(print -r -- "$input" | jq -er '.tool_input.command | strings') || return 1
+  [[ $cmd == *gh* ]] || return 0
+  cwd=$(print -r -- "$input" | jq -r '.cwd // empty') || return 1
+  local -a raw val roots
+  raw=("${(@z)cmd}")
+  val=("${(@Q)raw}")
+  # Plain variables: ${${:-/tmp/claude-$UID}:A} in an array garbles the "-" (zsh quirk).
+  local tmp_uid=/tmp/claude-$UID tmp_shared=/tmp/claude
+  roots=(${root:A} ${tmp_uid:A} ${tmp_shared:A})
+  local ghword='(^|[^A-Za-z0-9_.-])gh([^A-Za-z0-9_.-]|$)'
+  local i
+  no() { print -u2 -r -- "autopilot guard: $*"; return 1 }
+
+  if [[ $raw[1] != gh ]]; then
+    # gh in command position anywhere: a segment's first word (after assignments), or any
+    # word of a segment led by a precommand. A gh word that's only an argument (a commit
+    # message, a grep pattern) is fine, except inside a substitution, which can't be told
+    # apart from text cheaply: there the message says to use a file instead.
+    local -a seps=(';' '&&' '||' '|' '|&' '&' '&!' '&|' '(' ')' '{' '}' '!' then do else elif if while until)
+    local -a pre=(env xargs time nohup command exec builtin noglob nocorrect nice timeout sudo caffeinate)
+    local head=1 inpre=0
+    for (( i = 1; i <= $#raw; i++ )); do
+      if (( ${seps[(Ie)$raw[i]]} )); then head=1 inpre=0; continue; fi
+      if has_expansion "$raw[i]" && [[ $raw[i] =~ $ghword ]]; then
+        no "no gh inside a substitution or variable; if gh is only text here, put the text in a file (git commit -F <file>)"; return 1
+      fi
+      if (( head )); then
+        [[ $raw[i] =~ '^[A-Za-z_][A-Za-z0-9_]*=' ]] && continue
+        head=0
+        (( ${pre[(Ie)$val[i]]} )) && inpre=1
+      elif (( ! inpre )); then
+        continue
+      fi
+      [[ $val[i] == gh || $val[i] == */gh ]] && { no "run gh as its own plain command: first word gh, nothing else on the line"; return 1 }
+    done
+    return 0
+  fi
+
+  for (( i = 2; i <= $#raw; i++ )); do
+    has_expansion "$raw[i]" && { no "gh: no variables, globs, ~ or substitutions outside single quotes: ${raw[i]}"; return 1 }
+    [[ $raw[i] == [\;\&\|\(\)\{\}\<\>]* || $raw[i] == <->[\<\>]* ]] && { no "gh runs alone: no separators, pipes or redirects (${raw[i]})"; return 1 }
+  done
+  case "${val[2]-} ${val[3]-}" in
+    ('pr '(create|edit|comment|checks|view|list|diff|ready)|'issue '(edit|view|list)|'run '(view|list)|'release '(view|list)|'auth status') ;;
+    (*) no "gh ${val[2]-} ${val[3]-} isn't allowed in an autopilot run"; return 1 ;;
+  esac
+
+  body_file_ok() {  # <value> <raw>
+    local v=$1 r=$2 p real rt
+    local -a nl
+    [[ -n $v && $v != - ]] || { no "--body-file needs a file, not stdin"; return 1 }
+    [[ $r =~ '^[A-Za-z0-9_./+@%,:=-]+$' ]] || { no "--body-file: write the path plainly (no quotes, ~, globs or variables)"; return 1 }
+    p=$v
+    [[ $p == /* ]] || p=$cwd/$p
+    real=${p:A}
+    [[ -f $real ]] || { no "--body-file $v: not a regular file"; return 1 }
+    zstat -A nl +nlink -- $real || return 1
+    (( nl[1] == 1 )) || { no "--body-file $v: has ${nl[1]} hard links"; return 1 }
+    for rt in $roots; do [[ $real == $rt/* ]] && return 0; done
+    no "--body-file $v resolves to $real, outside the repo and the sandbox temp dirs"
+  }
+  target_ok() {  # <value>: refuse a selector that names another repo
+    [[ $1 == *://* || $1 == (#i)*github.com* || $1 == [^/]##/[^/]##\#* ]] \
+      && { no "gh: no URL or OWNER/REPO targets ($1); use the number in this repo"; return 1 }
+    return 0
+  }
+
+  local v opts=1
+  for (( i = 4; i <= $#val; i++ )); do
+    v=$val[i]
+    if (( ! opts )); then target_ok "$v" || return 1; continue; fi
+    case $v in
+      (--) opts=0 ;;
+      (--repo|--repo=*|-R*) no "gh: no --repo/-R; an autopilot run stays on its own repo"; return 1 ;;
+      (--body-file|-F) (( i++ )); body_file_ok "${val[i]-}" "${raw[i]-}" || return 1 ;;
+      (--body-file=*) body_file_ok "${v#--body-file=}" "${raw[i]#--body-file=}" || return 1 ;;
+      (--body|-b|--title|-t) (( i++ )) ;;
+      (--*) ;;
+      (-?) ;;
+      (-?*) no "gh: give short flags one at a time with a separate value ($v)"; return 1 ;;
+      (*) target_ok "$v" || return 1 ;;
+    esac
+  done
+  return 0
+}
+
+if [[ ${1:-} == --hook-gh ]]; then
+  PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+  ( gh_guard "${2:-}" ) && exit 0
+  exit 2
+fi
 
 usage() {
   cat <<'EOF'
@@ -102,13 +309,16 @@ allow=(${allow:#})
 #     or alias.
 #   - Edit(~/...): a literal path inside the repo, optionally ending in "/**", and no other
 #     glob character, so the checks below see the real path. No "." or ".." segment, no .git
-#     component, nothing under .claude/ but .claude/worktrees (project settings, hooks and
-#     skills would widen later sessions). Every component before the last must already exist,
-#     and none may be a symlink. Whether a symlink made mid-run is followed is Claude Code's
-#     permission check at use time, not this one.
+#     or .mcp.json component, and no .claude component except a leading .claude/worktrees
+#     (project settings, hooks and skills would widen later sessions, and every worktree has
+#     its own .claude/). Every component before the last must already exist, and none may
+#     be a symlink. Whether a symlink made mid-run is followed is Claude Code's permission
+#     check at use time, not this one.
+#   - A "/**" rule also gets deny rules (below) for the same names anywhere inside its
+#     subtree, since one glob can't be checked component by component here.
 #   - Nothing else. Widen this check deliberately if a contract ever needs more.
 rule_ok() {
-  local r=$1 inner lit rel comp p
+  local r=$1 inner lit rel comp p i
   local -a comps
   local gh_re='^gh (pr (create|edit|comment|checks|view|list|diff|ready)|issue (edit|view|list))( \*)?$'
   local path_re='^~(/[A-Za-z0-9._-]+)+(/\*\*)?$'
@@ -122,9 +332,13 @@ rule_ok() {
       lit=${${inner%/\*\*}/#\~/$HOME}
       [[ $lit == $repo_dir/* ]] || return 1
       rel=${lit#$repo_dir/}
-      [[ /$rel/ != */.git/* ]] || return 1
-      [[ $rel != .claude/* || $rel == .claude/worktrees || $rel == .claude/worktrees/* ]] || return 1
       comps=(${(s:/:)rel}) p=$repo_dir
+      for (( i = 1; i <= $#comps; i++ )); do
+        case $comps[i] in
+          (.git|.mcp.json) return 1 ;;
+          (.claude) (( i == 1 )) && [[ ${comps[2]-} == worktrees ]] || return 1 ;;
+        esac
+      done
       for comp in $comps; do
         p=$p/$comp
         [[ -L $p ]] && return 1
@@ -137,14 +351,37 @@ rule_ok() {
 for r in $allow; do
   rule_ok "$r" || die "contract allow rule refused: $r (allowed: gh pr|issue <subcommand> [*], or Edit of a plain path inside $repo_dir; see rule_ok)"
 done
+# Inside a "/**" subtree, deny what rule_ok refuses at its top: .git, .claude/ and .mcp.json
+# at any depth. Deny beats allow in Claude Code, and the ~/ form matches the allow rule's.
+typeset -a deny
+for r in $allow; do
+  [[ $r == 'Edit('*'/**)' ]] || continue
+  p=${${r#Edit\(}%/\*\*\)}
+  deny+=("Edit($p/**/.git)" "Edit($p/**/.git/**)" "Edit($p/**/.claude/**)" "Edit($p/**/.mcp.json)")
+done
 # The devlog sits outside the repo, so the run needs an explicit write rule for it. The
 # launcher adds it itself; the contract can't.
 allow+=("Edit(~/.claude/devlogs/autopilot-$repo-devlog.md)")
 
-# Phase 1 of the skill dates the owner's contract changes by their commit.
-if git -C "${contract:A:h}" rev-parse --git-dir >/dev/null 2>&1 \
-   && [[ -n $(git -C "${contract:A:h}" status --porcelain -- "${contract:A:t}") ]]; then
-  print -u2 -r -- "autopilot: note: $repo.md has uncommitted changes. The run reads them, but can't date them as your answers until they're committed."
+# Claude Code runs git in the repo itself, outside the sandbox, and so does --tidy. Refuse
+# a repo whose config holds anything but data keys (git_config_ok).
+find_git "$repo_dir" || die "contract path isn't inside a git checkout: $repo_dir"
+repo_git=("${reply[@]}")
+git_config_ok "${repo_git[2]}" "${repo_git[3]-}" \
+  || die "refusing $repo_dir: its git config has keys outside the allowlist; check them by hand (cfg_ok_pat)"
+
+# Phase 1 of the skill dates the owner's contract changes by their commit. Compared by blob
+# (hash-object --no-filters against HEAD), so no status, filter or fsmonitor runs.
+if find_git "${contract:A:h}"; then
+  contract_git=("${reply[@]}")
+  if git_config_ok "${contract_git[2]}" "${contract_git[3]-}" 2>/dev/null; then
+    crel=${${contract:A}#${contract_git[1]}/}
+    cblob=$(sgit -C "${contract_git[1]}" rev-parse -q --verify "HEAD:$crel" 2>/dev/null)
+    [[ -n $cblob && $cblob == $(sgit -C "${contract_git[1]}" hash-object --no-filters -- "$crel" 2>/dev/null) ]] \
+      || print -u2 -r -- "autopilot: note: $repo.md has uncommitted changes. The run reads them, but can't date them as your answers until they're committed."
+  else
+    print -u2 -r -- "autopilot: note: skipped the uncommitted-contract check; ${contract_git[2]}/config has keys outside the allowlist."
+  fi
 fi
 
 # --tidy: retire the trees of autopilot PRs that merged or closed. Registry-driven, so it
@@ -166,15 +403,18 @@ tidy_trees() {
   # must also sit directly under this repo's .claude/worktrees and, if it exists, be one of
   # the repo's own worktrees on a Claude Code-named branch.
   local root=${repo_dir:A}/.claude/worktrees
+  # The trees are found from the main checkout's side, so the contract path must be one
+  # (its config already passed git_config_ok at the top).
+  [[ ${repo_git[1]} == ${repo_dir:A} && ${repo_git[2]} == ${repo_dir:A}/.git ]] \
+    || die "--tidy needs the contract path to be a main checkout: $repo_dir"
   local -a known
-  known=(${${(M)${(f)"$(git -C "$repo_dir" worktree list --porcelain)"}:#worktree *}#worktree })
+  known=(${${(M)${(f)"$(sgit -C "$repo_dir" worktree list --porcelain)"}:#worktree *}#worktree })
   known=(${known:A})
 
   # The session that used a tree could write its git metadata (.git/worktrees/<id>/, and
   # the tree's .git file), e.g. point commondir at a config with core.fsmonitor set. So git
-  # never runs in a tree until its links are the standard ones, and then without fsmonitor
-  # or hooks, against the gitdir found from the main repo's side.
-  local -a safe_git=(git -c core.fsmonitor=false -c core.hooksPath=/dev/null)
+  # never runs in a tree until its links are the standard ones, and then only as sgit,
+  # against the gitdir found from the main repo's side.
   local -a G
   local f gd link
 
@@ -201,7 +441,7 @@ tidy_trees() {
         || { print -r -- "skip    ${wt:t}: its .git file doesn't point at $gd"; continue }
       [[ $(<$gd/commondir) == ../.. && ! -e $gd/config.worktree ]] \
         || { print -r -- "skip    ${wt:t}: nonstandard git metadata in $gd; check it by hand"; continue }
-      G=($safe_git --git-dir="$gd" --work-tree="$wt")
+      G=(sgit --git-dir="$gd" --work-tree="$wt")
     fi
     if ! pr=$(gh pr list --head "$br" --state all --limit 1 --json number,state,headRefOid,mergedAt,closedAt); then
       print -r -- "skip    ${wt:t}: gh couldn't look up $br"; continue
@@ -216,7 +456,10 @@ tidy_trees() {
 
     lb=''
     if [[ -d $wt ]]; then
-      [[ -z $($G status --porcelain) ]] || { print -r -- "skip    ${wt:t}: uncommitted changes"; continue }
+      # --ignore-submodules=all: a gitlink in a planted index would otherwise make status
+      # recurse into a nested repo with a config the session wrote. `worktree remove`
+      # refuses trees with submodules anyway.
+      [[ -z $($G status --porcelain --ignore-submodules=all) ]] || { print -r -- "skip    ${wt:t}: uncommitted changes"; continue }
       [[ $($G rev-parse HEAD) == $head ]] || { print -r -- "skip    ${wt:t}: HEAD isn't PR #$num's last head; unpushed work?"; continue }
       lb=$($G branch --show-current)
       [[ $lb == worktree-* ]] || { print -r -- "skip    ${wt:t}: branch '$lb' isn't a Claude Code worktree branch"; continue }
@@ -224,8 +467,8 @@ tidy_trees() {
     if [[ -d $wt ]]; then
       what="tree and local branch removed by autopilot --tidy"
       (( dry )) && { print -r -- "would remove ${wt:t}${lb:+ and branch $lb} (PR #$num ${state:l})"; continue }
-      $safe_git -C "$repo_dir" worktree remove "$wt" || { print -r -- "skip    ${wt:t}: git worktree remove failed"; continue }
-      [[ -n $lb ]] && $safe_git -C "$repo_dir" branch -D "$lb" >/dev/null
+      sgit -C "$repo_dir" worktree remove "$wt" || { print -r -- "skip    ${wt:t}: git worktree remove failed"; continue }
+      [[ -n $lb ]] && sgit -C "$repo_dir" branch -D "$lb" >/dev/null
     else
       what="tree was already gone; entry closed by autopilot --tidy"
       (( dry )) && { print -r -- "would close ${wt:t}'s entry, tree already gone (PR #$num ${state:l})"; continue }
@@ -251,8 +494,12 @@ if (( tidy )); then
   tidy_trees; exit $?
 fi
 
-settings=$(jq -n --argjson allow "$(print -rl -- $allow | jq -R . | jq -s .)" --arg iso "$isolation" '
-  { permissions: { denyInsteadOfPrompting: true, allow: $allow },
+json_list() { if (( $# )); then print -rl -- "$@" | jq -R . | jq -s .; else print -r -- '[]'; fi }
+hook_cmd="${(q)self} --hook-gh ${(q)${repo_dir:A}}"
+settings=$(jq -n --argjson allow "$(json_list $allow)" --argjson deny "$(json_list $deny)" \
+    --arg hook "$hook_cmd" --arg iso "$isolation" '
+  { permissions: { denyInsteadOfPrompting: true, allow: $allow, deny: $deny },
+    hooks: { PreToolUse: [ { matcher: "Bash", hooks: [ { type: "command", command: $hook } ] } ] },
     autoContinueAtUsageLimit: true }
   + (if $iso != "" then { worktree: { bgIsolation: $iso } } else {} end)')
 
